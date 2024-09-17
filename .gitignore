@@ -1,0 +1,13 @@
+/build/
+# .vscode/
+.cache/
+/apps/test/
+bin/
+lib/
+
+*.exe
+*.lib
+*.a
+*.pdb
+*.dll
+*.spv

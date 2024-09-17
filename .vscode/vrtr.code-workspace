@@ -1,0 +1,37 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"cSpell.words": [
+      "binfo",
+      "descriptorset",
+      "drawcalls",
+      "fastgltf",
+      "GLFW",
+      "Gltf",
+      "mipmap",
+      "Multisample",
+      "Multisampling",
+      "Renderable",
+      "setbind",
+      "Spirv",
+      "Subresource",
+      "swapchain",
+      "Swapchains",
+      "VKAPI",
+      "vkinit",
+      "vkutil",
+      "Vulkan"
+    ],
+    "glsl-canvas.useCompactFormatter": false,
+    "glsllint.glslangValidatorArgs": [
+      "-V"
+    ],
+    "cSpell.enableFiletypes": [
+      "glsl"
+    ]
+	}
+}

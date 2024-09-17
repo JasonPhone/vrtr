@@ -1,0 +1,27 @@
+[submodule "extern/GLM"]
+	path = extern/GLM
+	url = https://github.com/g-truc/glm.git
+[submodule "extern/SDL"]
+	path = extern/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "extern/ImGUI"]
+	path = extern/ImGUI
+	url = https://github.com/ocornut/imgui.git
+[submodule "extern/stb"]
+	path = extern/stb
+	url = https://github.com/nothings/stb.git
+[submodule "extern/tinyobjloader"]
+	path = extern/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader.git
+[submodule "extern/vk-bootstrap"]
+	path = extern/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap.git
+[submodule "extern/VMA"]
+	path = extern/VMA
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "extern/fmt"]
+	path = extern/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "extern/fastgltf"]
+	path = extern/fastgltf
+	url = https://github.com/spnda/fastgltf

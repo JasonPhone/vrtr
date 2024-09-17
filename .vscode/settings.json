@@ -1,0 +1,7 @@
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "editor.tabSize": 2,
+    "editor.suggest.showSnippets": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "cmake.configureOnOpen": true
+}
