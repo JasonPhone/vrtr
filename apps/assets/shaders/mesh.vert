@@ -8,6 +8,7 @@
 layout(location = 0)out vec3 outNormal;
 layout(location = 1)out vec3 outColor;
 layout(location = 2)out vec2 outUV;
+layout(location = 3)out vec2 out_mv;
 
 struct Vertex {
 
@@ -41,4 +42,7 @@ void main()
   outColor = v.color.xyz * materialData.colorFactors.xyz;
   outUV.x = v.uv_x;
   outUV.y = v.uv_y;
+
+  vec4 prev_position = sceneData.prev_view_proj * PushConstants.render_matrix * position;
+  out_mv = prev_position.xy / prev_position.w - gl_Position.xy / gl_Position.w;
 }

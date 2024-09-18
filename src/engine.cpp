@@ -412,6 +412,13 @@ void Engine::run() {
         ImGui::Text("\tGPU compute     %f ms", t_comp);
         ImGui::Text("\tGPU geometry    %f ms", t_geom);
         ImGui::Text("\tGPU others      %f ms", t_other);
+
+        auto& cam_pos = m_main_camera.position;
+        ImGui::Text("Camera:");
+        ImGui::Text("\tPosition (%.3f, %.3f, %.3f)", cam_pos.x, cam_pos.y, cam_pos.z);
+        ImGui::Text("\tPitch    %.3f", m_main_camera.pitch);
+        ImGui::Text("\tYaw      %.3f", m_main_camera.yaw);
+
       }
       ImGui::End();
     }
@@ -1176,6 +1183,7 @@ void Engine::destroyImage(const AllocatedImage &image) {
   vmaDestroyImage(m_allocator, image.image, image.allocation);
 }
 void Engine::updateScene() {
+  m_scene_data.prev_view_proj = m_scene_data.view_proj;
   m_main_camera.update();
   m_main_draw_context.opaque_surfaces.clear();
   m_main_draw_context.transparent_surfaces.clear();
