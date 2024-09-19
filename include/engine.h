@@ -1,7 +1,6 @@
 #pragma once
 #include "vk_types.h"
 #include "vk_descriptors.h"
-#include "camera.h"
 
 /**
  * @brief Manage the deletion.
@@ -54,9 +53,6 @@ struct EngineStats {
   Timer t_cpu_draw;
 };
 
-// FIXME This affects imgui drag lagging.
-constexpr uint32_t kFrameOverlap = 3;
-
 class Engine : public ObjectBase {
 public:
   // Engine() = delete;
@@ -65,11 +61,8 @@ public:
   void draw();
   void cleanup();
   void immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func);
-  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices,
-                            std::span<Vertex> vertices);
 
   bool stop_rendering{false};
-  bool require_resize{false};
   bool is_initialized{false};
   int frame_number{0};
   VkExtent2D window_extent{1920, 1080};
@@ -91,7 +84,6 @@ private:
   VkDebugUtilsMessengerEXT m_debug_msngr; // Vulkan debug output handle
   VkPhysicalDevice m_chosen_GPU;          // GPU chosen as the default device
   VkDevice m_device;                      // Vulkan device for commands
-  VkSurfaceKHR m_surface;                 // Vulkan window surface
 
   VkExtent2D m_draw_extent;
   float m_render_scale = 1.f;
@@ -115,8 +107,7 @@ private:
   // Output images.
   AllocatedImage m_color_image;
   AllocatedImage m_depth_image;
-  VkImage m_save_image;
-  VkDeviceMemory m_save_mem;
+  AllocatedImage m_save_image;
 
   DescriptorAllocator m_global_ds_allocator;
   VkDescriptorSet m_draw_image_ds;
@@ -127,7 +118,6 @@ private:
   int m_cur_comp_pipeline_idx = 2;
 
   void updateScene();
-  Camera m_main_camera;
 
   VkFence m_imm_fence;
   VkCommandBuffer m_imm_cmd;

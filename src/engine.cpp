@@ -7,9 +7,6 @@
 #include "vk_pipelines.h"
 #include <VkBootstrap.h>
 
-#include <chrono>
-#include <thread>
-
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 
@@ -33,7 +30,6 @@ void Engine::init() {
   initPipelines();
 
   initDefaultData();
-  m_main_camera.init();
   is_initialized = true;
 }
 
@@ -115,11 +111,12 @@ void Engine::draw() {
     m_capture = false;
 
     immediateSubmit([&](VkCommandBuffer cmd) {
-      vkutil::transitionImage(cmd, m_save_image, VK_IMAGE_LAYOUT_UNDEFINED,
+      vkutil::transitionImage(cmd, m_save_image.image,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-      vkutil::copyImage(cmd, m_color_image.image, m_save_image, m_draw_extent,
-                        m_draw_extent);
-      vkutil::transitionImage(cmd, m_save_image,
+      vkutil::copyImage(cmd, m_color_image.image, m_save_image.image,
+                        m_draw_extent, m_draw_extent);
+      vkutil::transitionImage(cmd, m_save_image.image,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                               VK_IMAGE_LAYOUT_GENERAL);
     });
@@ -127,10 +124,9 @@ void Engine::draw() {
     // Get layout of the image (including row pitch)
     VkImageSubresource subr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0};
     VkSubresourceLayout subrl;
-    vkGetImageSubresourceLayout(m_device, m_save_image, &subr, &subrl);
-    // Map image memory so we can start copying from it
+    vkGetImageSubresourceLayout(m_device, m_save_image.image, &subr, &subrl);
     unsigned char *data;
-    vkMapMemory(m_device, m_save_mem, 0, VK_WHOLE_SIZE, 0, (void **)&data);
+    vmaMapMemory(m_allocator, m_save_image.allocation, (void **)&data);
     data += subrl.offset;
     fmt::println("offset {}, size {}, arrP {}, depP {}, rowP {}", subrl.offset,
                  subrl.size, subrl.arrayPitch, subrl.depthPitch,
@@ -148,7 +144,7 @@ void Engine::draw() {
     }
     out_file.close();
     fmt::println("Screenshot saved to disk");
-    vkUnmapMemory(m_device, m_save_mem);
+    vmaUnmapMemory(m_allocator, m_save_image.allocation);
   }
 }
 void Engine::drawBackground(VkCommandBuffer cmd) {
@@ -259,7 +255,6 @@ void Engine::initVulkan() {
     vmaDestroyAllocator(m_allocator);
     vkDestroyQueryPool(m_device, m_query_pool_timestamp, nullptr);
     vkDestroyDevice(m_device, nullptr);
-    vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     vkb::destroy_debug_utils_messenger(m_instance, m_debug_msngr);
     vkDestroyInstance(m_instance, nullptr);
   });
@@ -287,16 +282,14 @@ void Engine::initImages() {
   m_depth_image =
       createImage(depth_img_ext, VK_FORMAT_D32_SFLOAT, depth_img_usage);
 
-  m_main_deletion_queue.push([&]() {
-    destroyImage(m_color_image);
-    destroyImage(m_depth_image);
-  });
+  m_main_deletion_queue.push([&]() {});
 
   m_save_image = {};
   VkImageCreateInfo ci_image = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                                 .pNext = nullptr};
   ci_image.imageType = VK_IMAGE_TYPE_2D;
   ci_image.format = VK_FORMAT_R8G8B8A8_UNORM;
+  // VK_FORMAT_R32G32B32A32_SFLOAT;
   ci_image.extent = color_img_ext;
   ci_image.arrayLayers = 1;
   ci_image.mipLevels = 1;
@@ -304,31 +297,19 @@ void Engine::initImages() {
   ci_image.samples = VK_SAMPLE_COUNT_1_BIT;
   ci_image.tiling = VK_IMAGE_TILING_LINEAR;
   ci_image.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  VK_CHECK(vkCreateImage(m_device, &ci_image, nullptr, &m_save_image));
-  VkMemoryRequirements mem_req = {};
-  VkMemoryAllocateInfo mem_alloc = {
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .pNext = nullptr};
-  vkGetImageMemoryRequirements(m_device, m_save_image, &mem_req);
-  mem_alloc.allocationSize = mem_req.size;
-  VkPhysicalDeviceMemoryProperties mem_p = {};
-  vkGetPhysicalDeviceMemoryProperties(m_chosen_GPU, &mem_p);
-  auto typeBits = mem_req.memoryTypeBits;
-  VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-  for (uint32_t i = 0; i < mem_p.memoryTypeCount; i++) {
-    if ((typeBits & 1) == 1) {
-      if ((mem_p.memoryTypes[i].propertyFlags & properties) == properties) {
-        mem_alloc.memoryTypeIndex = i;
-      }
-    }
-    typeBits >>= 1;
-  }
-  VK_CHECK(vkAllocateMemory(m_device, &mem_alloc, nullptr, &m_save_mem));
-  VK_CHECK(vkBindImageMemory(m_device, m_save_image, m_save_mem, 0));
+  VmaAllocationCreateInfo ci_alloc = {};
+  ci_alloc.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+  ci_alloc.requiredFlags =
+      VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+  VK_CHECK(vmaCreateImage(m_allocator, &ci_image, &ci_alloc,
+                          &m_save_image.image, &m_save_image.allocation,
+                          nullptr));
 
   m_main_deletion_queue.push([&]() {
-    vkDestroyImage(m_device, m_save_image, nullptr);
-    vkFreeMemory(m_device, m_save_mem, nullptr);
+    destroyImage(m_color_image);
+    destroyImage(m_depth_image);
+    // This image has no VkImageView, as shaders don't access it.
+    vmaDestroyImage(m_allocator, m_save_image.image, m_save_image.allocation);
   });
 }
 void Engine::initCommands() {
@@ -558,54 +539,6 @@ AllocatedBuffer Engine::createBuffer(size_t alloc_size,
 }
 void Engine::destroyBuffer(const AllocatedBuffer &buffer) {
   vmaDestroyBuffer(m_allocator, buffer.buffer, buffer.allocation);
-}
-GPUMeshBuffers Engine::uploadMesh(std::span<uint32_t> indices,
-                                  std::span<Vertex> vertices) {
-  const size_t kVertexBufferSize = vertices.size() * sizeof(Vertex);
-  const size_t kIndexBufferSize = indices.size() * sizeof(uint32_t);
-
-  GPUMeshBuffers mesh;
-  mesh.vertex_buffer = createBuffer(
-      kVertexBufferSize,
-      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-      VMA_MEMORY_USAGE_GPU_ONLY);
-  VkBufferDeviceAddressInfo i_device_address{
-      .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-      .buffer = mesh.vertex_buffer.buffer,
-  };
-  mesh.vertex_buffer_address =
-      vkGetBufferDeviceAddress(m_device, &i_device_address);
-
-  mesh.index_buffer = createBuffer(kIndexBufferSize,
-                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                   VMA_MEMORY_USAGE_GPU_ONLY);
-
-  // Write data into a CPU-only staging buffer, then upload to GPU-only
-  // buffer.
-  AllocatedBuffer staging =
-      createBuffer(kVertexBufferSize + kIndexBufferSize,
-                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-  void *data = staging.allocation->GetMappedData();
-  memcpy(data, vertices.data(), kVertexBufferSize);
-  memcpy((char *)data + kVertexBufferSize, indices.data(), kIndexBufferSize);
-  immediateSubmit([&](VkCommandBuffer cmd) {
-    VkBufferCopy vertex_copy = {};
-    vertex_copy.dstOffset = 0;
-    vertex_copy.srcOffset = 0;
-    vertex_copy.size = kVertexBufferSize;
-    vkCmdCopyBuffer(cmd, staging.buffer, mesh.vertex_buffer.buffer, 1,
-                    &vertex_copy);
-    VkBufferCopy index_copy = {};
-    index_copy.dstOffset = 0;
-    index_copy.srcOffset = kVertexBufferSize;
-    index_copy.size = kIndexBufferSize;
-    vkCmdCopyBuffer(cmd, staging.buffer, mesh.index_buffer.buffer, 1,
-                    &index_copy);
-  });
-  destroyBuffer(staging);
-  return mesh;
 }
 
 void Engine::initDefaultData() {}
