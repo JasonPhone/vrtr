@@ -20,6 +20,8 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 
+#include <fstream>
+
 constexpr bool bUseValidationLayers = true;
 
 static Engine *loaded_engine = nullptr;
@@ -190,6 +192,16 @@ void Engine::draw() {
                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         m_query_pool_timestamp, 5);
+
+    // if (m_capture) {
+    //   vkutil::transitionImage(cmd, m_save_image, VK_IMAGE_LAYOUT_UNDEFINED,
+    //                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    //   vkutil::copyImage(cmd, m_color_image.image, m_save_image, m_draw_extent,
+    //                     m_draw_extent);
+    //   vkutil::transitionImage(cmd, m_save_image,
+    //                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    //                           VK_IMAGE_LAYOUT_GENERAL);
+    // }
   }
   VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -227,6 +239,46 @@ void Engine::draw() {
                         m_timestamps.size() * sizeof(uint64_t),
                         m_timestamps.data(), sizeof(uint64_t),
                         VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+
+  if (m_capture) {
+    m_capture = false;
+
+    immediateSubmit([&](VkCommandBuffer cmd) {
+      vkutil::transitionImage(cmd, m_save_image, VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+      vkutil::copyImage(cmd, m_color_image.image, m_save_image, m_draw_extent,
+                        m_draw_extent);
+      vkutil::transitionImage(cmd, m_save_image,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_GENERAL);
+    });
+    uint32_t width = m_draw_extent.width, height = m_draw_extent.height;
+    // Get layout of the image (including row pitch)
+    VkImageSubresource subr{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0};
+    VkSubresourceLayout subrl;
+    vkGetImageSubresourceLayout(m_device, m_save_image, &subr, &subrl);
+    // Map image memory so we can start copying from it
+    unsigned char *data;
+    vkMapMemory(m_device, m_save_mem, 0, VK_WHOLE_SIZE, 0, (void **)&data);
+    data += subrl.offset;
+    fmt::println("offset {}, size {}, arrP {}, depP {}, rowP {}", subrl.offset,
+                 subrl.size, subrl.arrayPitch, subrl.depthPitch,
+                 subrl.rowPitch);
+    std::ofstream out_file("./screen_shot.ppm",
+                           std::ios::out | std::ios::binary);
+    out_file << "P6\n" << width << "\n" << height << "\n" << 255 << "\n";
+    for (uint32_t y = 0; y < height; y++) {
+      unsigned int *row = (unsigned int *)data;
+      for (uint32_t x = 0; x < width; x++) {
+        out_file.write((char *)row, 3);
+        row++;
+      }
+      data += subrl.rowPitch;
+    }
+    out_file.close();
+    fmt::println("Screenshot saved to disk");
+    vkUnmapMemory(m_device, m_save_mem);
+  }
 }
 void Engine::drawBackground(VkCommandBuffer cmd) {
   auto &background = m_compute_pipelines[m_cur_comp_pipeline_idx];
@@ -368,6 +420,8 @@ void Engine::run() {
       auto &io = ImGui::GetIO();
       if (io.WantCaptureMouse == false) // Imgui intercepting mouse.
         m_main_camera.processSDLEvent(e);
+      if (e.type == SDL_EVENT_KEY_UP && e.key.key == SDLK_C)
+        m_capture = true;
     }
 
     // Overall render configure.
@@ -413,12 +467,11 @@ void Engine::run() {
         ImGui::Text("\tGPU geometry    %f ms", t_geom);
         ImGui::Text("\tGPU others      %f ms", t_other);
 
-        auto& cam_pos = m_main_camera.position;
+        auto &cam_p = m_main_camera.position;
         ImGui::Text("Camera:");
-        ImGui::Text("\tPosition (%.3f, %.3f, %.3f)", cam_pos.x, cam_pos.y, cam_pos.z);
+        ImGui::Text("\tPosition (%.3f, %.3f, %.3f)", cam_p.x, cam_p.y, cam_p.z);
         ImGui::Text("\tPitch    %.3f", m_main_camera.pitch);
         ImGui::Text("\tYaw      %.3f", m_main_camera.yaw);
-
       }
       ImGui::End();
     }
@@ -552,6 +605,45 @@ void Engine::initSwapchain() {
     destroyImage(m_color_image);
     destroyImage(m_depth_image);
     destroySwapchain();
+  });
+
+  m_save_image = {};
+  VkImageCreateInfo ci_image = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                                .pNext = nullptr};
+  ci_image.imageType = VK_IMAGE_TYPE_2D;
+  ci_image.format = VK_FORMAT_R8G8B8A8_UNORM;
+  ci_image.extent = color_img_ext;
+  ci_image.arrayLayers = 1;
+  ci_image.mipLevels = 1;
+  ci_image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  ci_image.samples = VK_SAMPLE_COUNT_1_BIT;
+  ci_image.tiling = VK_IMAGE_TILING_LINEAR;
+  ci_image.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  VK_CHECK(vkCreateImage(m_device, &ci_image, nullptr, &m_save_image));
+  VkMemoryRequirements mem_req = {};
+  VkMemoryAllocateInfo mem_alloc = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .pNext = nullptr};
+  vkGetImageMemoryRequirements(m_device, m_save_image, &mem_req);
+  mem_alloc.allocationSize = mem_req.size;
+  VkPhysicalDeviceMemoryProperties mem_p = {};
+  vkGetPhysicalDeviceMemoryProperties(m_chosen_GPU, &mem_p);
+  auto typeBits = mem_req.memoryTypeBits;
+  VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  for (uint32_t i = 0; i < mem_p.memoryTypeCount; i++) {
+    if ((typeBits & 1) == 1) {
+      if ((mem_p.memoryTypes[i].propertyFlags & properties) == properties) {
+        mem_alloc.memoryTypeIndex = i;
+      }
+    }
+    typeBits >>= 1;
+  }
+  VK_CHECK(vkAllocateMemory(m_device, &mem_alloc, nullptr, &m_save_mem));
+  VK_CHECK(vkBindImageMemory(m_device, m_save_image, m_save_mem, 0));
+
+  m_main_deletion_queue.push([&]() {
+    vkDestroyImage(m_device, m_save_image, nullptr);
+    vkFreeMemory(m_device, m_save_mem, nullptr);
   });
 }
 void Engine::initCommands() {

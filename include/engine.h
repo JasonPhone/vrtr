@@ -189,6 +189,8 @@ private:
   // Output images.
   AllocatedImage m_color_image;
   AllocatedImage m_depth_image;
+  VkImage m_save_image;
+  VkDeviceMemory m_save_mem;
 
   MaterialInstance m_default_material;
   GLTFMetallicRoughness m_metal_rough_mat;
@@ -218,6 +220,7 @@ private:
   VkQueryPool m_query_pool_timestamp;
   std::vector<uint64_t> m_timestamps;
   float m_timestamp_period;
+  bool m_capture = false;
 
 private:
   void initVulkan();
