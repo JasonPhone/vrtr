@@ -1,6 +1,5 @@
 #pragma once
 #include "vk_types.h"
-#include <SDL3/SDL_events.h>
 
 class Camera {
 public:
@@ -11,7 +10,6 @@ public:
 
   glm::mat4 getViewMatrix();
   glm::mat4 getRotationMatrix();
-  void processSDLEvent(SDL_Event &e);
   void update();
   void init();
 };

@@ -23,25 +23,16 @@ if(WIN32)
     ${SOURCE_DIR}/vk_images.cpp
     ${SOURCE_DIR}/vk_descriptors.cpp
     ${SOURCE_DIR}/vk_pipelines.cpp
-    ${SOURCE_DIR}/vk_loader.cpp
-    ${SOURCE_DIR}/renderable.cpp
     ${SOURCE_DIR}/camera.cpp
-  )
-  target_link_libraries(engine PRIVATE
-    fastgltf
   )
   target_include_directories(engine PRIVATE
     ${Vulkan_INCLUDE_DIRS}
 
     ${CMAKE_SOURCE_DIR}/extern/GLM
-    ${CMAKE_SOURCE_DIR}/extern/SDL/include
-    ${CMAKE_SOURCE_DIR}/extern/ImGUI/
     ${CMAKE_SOURCE_DIR}/extern/stb
-    ${CMAKE_SOURCE_DIR}/extern/tinyobjloader
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
     ${CMAKE_SOURCE_DIR}/extern/fmt/include
-    ${CMAKE_SOURCE_DIR}/extern/fastgltf/include
 
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
@@ -53,10 +44,7 @@ if(WIN32)
     ${Vulkan_INCLUDE_DIRS}
 
     ${CMAKE_SOURCE_DIR}/extern/GLM
-    ${CMAKE_SOURCE_DIR}/extern/SDL/include
-    ${CMAKE_SOURCE_DIR}/extern/ImGUI/
     ${CMAKE_SOURCE_DIR}/extern/stb
-    ${CMAKE_SOURCE_DIR}/extern/tinyobjloader
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
     ${CMAKE_SOURCE_DIR}/extern/fmt/include
@@ -69,11 +57,9 @@ if(WIN32)
 
     # External binaries.
     ${Vulkan_LIBRARIES}
-    SDL3::SDL3
-    tinyobjloader
-    imgui
     vk-bootstrap::vk-bootstrap
     stb
+
     # vma # Impl in ./src/engine.cpp
     fmt::fmt
 

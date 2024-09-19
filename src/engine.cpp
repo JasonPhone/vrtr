@@ -1,18 +1,11 @@
 #define VMA_IMPLEMENTATION
 #include "engine.h"
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
-
 #include "vk_initializers.h"
 #include "vk_types.h"
 #include "vk_images.h"
 #include "vk_pipelines.h"
 #include <VkBootstrap.h>
-
-#include <imgui.h>
-#include <backends/imgui_impl_sdl3.h>
-#include <backends/imgui_impl_vulkan.h>
 
 #include <chrono>
 #include <thread>
@@ -26,57 +19,18 @@ constexpr bool bUseValidationLayers = true;
 
 static Engine *loaded_engine = nullptr;
 
-bool isVisible(const RenderObject &obj, const glm::mat4 &view_proj) {
-  std::array<glm::vec3, 8> corners{
-      glm::vec3{1, 1, 1},   glm::vec3{1, 1, -1},   glm::vec3{1, -1, 1},
-      glm::vec3{1, -1, -1}, glm::vec3{-1, 1, 1},   glm::vec3{-1, 1, -1},
-      glm::vec3{-1, -1, 1}, glm::vec3{-1, -1, -1},
-  };
-  glm::vec3 min = {1.5, 1.5, 1.5};
-  glm::vec3 max = {-1.5, -1.5, -1.5};
-  glm::mat4 matrix = view_proj * obj.transform;
-
-  for (int c = 0; c < 8; c++) {
-    // The sphere is inscribed of this cube.
-    glm::vec4 v =
-        matrix *
-        glm::vec4(obj.bound.origin + (corners[c] * obj.bound.radius), 1.f);
-    // Perspective correction.
-    v.x = v.x / v.w;
-    v.y = v.y / v.w;
-    v.z = v.z / v.w;
-    min = glm::min(glm::vec3{v.x, v.y, v.z}, min);
-    max = glm::max(glm::vec3{v.x, v.y, v.z}, max);
-  }
-  // check the clip space box is within the view
-  if (min.z > 1.f || max.z < 0.f || min.x > 1.f || max.x < -1.f ||
-      min.y > 1.f || max.y < -1.f) {
-    return false;
-  } else {
-    return true;
-  }
-}
-
 Engine &Engine::get() { return *loaded_engine; }
 void Engine::init() {
   // Only one engine initialization is allowed with the application.
   assert(loaded_engine == nullptr);
   loaded_engine = this;
-  // We initialize SDL and create a window with it.
-  SDL_Init(SDL_INIT_VIDEO);
-  SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
-  // (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
-  window = SDL_CreateWindow("Vulkan Engine", window_extent.width,
-                            window_extent.height, window_flags);
 
   initVulkan();
-  initSwapchain();
+  initImages();
   initCommands();
   initSyncStructures();
   initDescriptors();
   initPipelines();
-
-  initImGui();
 
   initDefaultData();
   m_main_camera.init();
@@ -87,67 +41,30 @@ void Engine::cleanup() {
   if (is_initialized) {
     // Order matters, reversed of initialization.
     vkDeviceWaitIdle(m_device); // Wait for GPU to finish.
-    m_loaded_scenes.clear();
-    for (uint32_t i = 0; i < kFrameOverlap; i++) {
-      // Cmd buffer is destroyed with pool it comes from.
-      vkDestroyCommandPool(m_device, m_frames[i].cmd_pool, nullptr);
-      vkDestroyFence(m_device, m_frames[i].render_fence, nullptr);
-      vkDestroySemaphore(m_device, m_frames[i].render_semaphore, nullptr);
-      vkDestroySemaphore(m_device, m_frames[i].swapchain_semaphore, nullptr);
-      m_frames[i].deletion_queue.flush();
-    }
-    m_metal_rough_mat.clearResources(m_device);
-
-    /**
-     * @note  Global vma allocator must be deleted last.
-     *        some allocations rely on this.
-     */
     m_main_deletion_queue.flush();
-
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-    SDL_DestroyWindow(window);
   }
   loaded_engine = nullptr;
 }
 
 void Engine::draw() {
+  fmt::println("draw");
   stats.t_scene_update.begin();
   updateScene();
   stats.t_scene_update.end();
   stats.t_cpu_draw.begin();
-  VK_CHECK(vkWaitForFences(m_device, 1, &getCurrentFrame().render_fence, true,
-                           VK_ONE_SEC));
+  VK_CHECK(vkWaitForFences(m_device, 1, &m_compute_fence, true, VK_ONE_SEC));
   // Free objects dedicated to this frame (in last iteration).
-  getCurrentFrame().deletion_queue.flush();
-  getCurrentFrame().frame_descriptors.clearPools(m_device);
-  VK_CHECK(vkResetFences(m_device, 1, &getCurrentFrame().render_fence));
-
-  // Request an image to draw to.
-  uint32_t swapchain_img_idx;
-  // Will signal the semaphore.
-  VkResult e = vkAcquireNextImageKHR(m_device, m_swapchain, VK_ONE_SEC,
-                                     getCurrentFrame().swapchain_semaphore,
-                                     nullptr, &swapchain_img_idx);
-  if (e == VK_ERROR_OUT_OF_DATE_KHR) {
-    require_resize = true;
-    stats.t_cpu_draw.end();
-    return;
-  }
+  VK_CHECK(vkResetFences(m_device, 1, &m_compute_fence));
 
   // Clear the cmd buffer.
-  VkCommandBuffer cmd = getCurrentFrame().cmd_buffer_main;
+  VkCommandBuffer cmd = m_compute_cmd;
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
   // Record cmd. Bit is to tell vulkan buffer is used exactly once.
   VkCommandBufferBeginInfo cmd_begin_info =
       vkinit::cmdBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-  m_draw_extent.width =
-      std::min(m_color_image.extent.width, m_swapchain_extent.width) *
-      m_render_scale;
-  m_draw_extent.height =
-      std::min(m_color_image.extent.height, m_swapchain_extent.height) *
-      m_render_scale;
+  m_draw_extent.width = m_color_image.extent.width;
+  m_draw_extent.height = m_color_image.extent.height;
 
   VK_CHECK(vkBeginCommandBuffer(cmd, &cmd_begin_info));
   vkCmdResetQueryPool(cmd, m_query_pool_timestamp, 0,
@@ -167,7 +84,6 @@ void Engine::draw() {
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transitionImage(cmd, m_depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-    drawGeometry(cmd);
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         m_query_pool_timestamp, 3);
     // Copy to swapchain.
@@ -176,61 +92,16 @@ void Engine::draw() {
     vkutil::transitionImage(cmd, m_color_image.image,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkutil::transitionImage(cmd, m_swapchain_imgs[swapchain_img_idx],
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vkutil::copyImage(cmd, m_color_image.image,
-                      m_swapchain_imgs[swapchain_img_idx], m_draw_extent,
-                      m_swapchain_extent);
-    vkutil::transitionImage(cmd, m_swapchain_imgs[swapchain_img_idx],
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    // GUI drawing.
-    drawImGui(cmd, m_swapchain_img_views[swapchain_img_idx]);
-    vkutil::transitionImage(cmd, m_swapchain_imgs[swapchain_img_idx],
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         m_query_pool_timestamp, 5);
-
-    // if (m_capture) {
-    //   vkutil::transitionImage(cmd, m_save_image, VK_IMAGE_LAYOUT_UNDEFINED,
-    //                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    //   vkutil::copyImage(cmd, m_color_image.image, m_save_image, m_draw_extent,
-    //                     m_draw_extent);
-    //   vkutil::transitionImage(cmd, m_save_image,
-    //                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    //                           VK_IMAGE_LAYOUT_GENERAL);
-    // }
   }
   VK_CHECK(vkEndCommandBuffer(cmd));
 
   // Submit commands.
   VkCommandBufferSubmitInfo cmd_submit_info = vkinit::cmdBufferSubmitInfo(cmd);
-  VkSemaphoreSubmitInfo wait_info = vkinit::semaphoreSubmitInfo(
-      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
-      getCurrentFrame().swapchain_semaphore);
-  VkSemaphoreSubmitInfo signal_info = vkinit::semaphoreSubmitInfo(
-      VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, getCurrentFrame().render_semaphore);
   VkSubmitInfo2 submit_info =
-      vkinit::submitInfo(&cmd_submit_info, &signal_info, &wait_info);
-  VK_CHECK(vkQueueSubmit2(m_graphic_queue, 1, &submit_info,
-                          getCurrentFrame().render_fence));
-
-  // Present image.
-  VkPresentInfoKHR present_info = vkinit::presentInfo();
-  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  present_info.pNext = nullptr;
-  present_info.pSwapchains = &m_swapchain;
-  present_info.swapchainCount = 1;
-  present_info.pWaitSemaphores = &getCurrentFrame().render_semaphore;
-  present_info.waitSemaphoreCount = 1;
-  present_info.pImageIndices = &swapchain_img_idx;
-
-  e = vkQueuePresentKHR(m_graphic_queue, &present_info);
-  if (e == VK_ERROR_OUT_OF_DATE_KHR) {
-    require_resize = true;
-  }
+      vkinit::submitInfo(&cmd_submit_info, nullptr, nullptr);
+  VK_CHECK(vkQueueSubmit2(m_graphic_queue, 1, &submit_info, m_compute_fence));
 
   frame_number++;
   stats.t_cpu_draw.end();
@@ -292,193 +163,13 @@ void Engine::drawBackground(VkCommandBuffer cmd) {
   vkCmdDispatch(cmd, std::ceil(m_draw_extent.width / 16.f),
                 std::ceil(m_draw_extent.height / 16.f), 1);
 }
-void Engine::drawGeometry(VkCommandBuffer cmd) {
-  stats.n_triangles = 0;
-  stats.n_drawcalls = 0;
-  std::vector<size_t> opaque_index;
-  opaque_index.reserve(m_main_draw_context.opaque_surfaces.size());
-  // Visibility culling.
-  for (size_t i = 0; i < m_main_draw_context.opaque_surfaces.size(); i++) {
-    if (isVisible(m_main_draw_context.opaque_surfaces[i],
-                  m_scene_data.view_proj))
-      opaque_index.push_back(i);
-  }
-  // Should reduce rebinding?
-  MaterialPipeline *last_pipeline = nullptr;
-  MaterialInstance *last_material = nullptr;
-  VkBuffer last_index_buffer = VK_NULL_HANDLE;
-  auto drawObjet = [&](const RenderObject &r, VkDescriptorSet &frame_ds) {
-    if (r.material != last_material) {
-      last_material = r.material;
-      if (r.material->p_pipeline != last_pipeline) {
-        last_pipeline = r.material->p_pipeline;
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          r.material->p_pipeline->pipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                r.material->p_pipeline->layout, 0, 1, &frame_ds,
-                                0, nullptr);
-        VkViewport view_port = {
-            .x = 0, .y = 0, .minDepth = 0.f, .maxDepth = 1.f};
-        view_port.width = m_draw_extent.width;
-        view_port.height = m_draw_extent.height;
-        vkCmdSetViewport(cmd, 0, 1, &view_port);
-        VkRect2D scissor = {};
-        scissor.offset.x = scissor.offset.y = 0;
-        scissor.extent.width = m_draw_extent.width;
-        scissor.extent.height = m_draw_extent.height;
-        vkCmdSetScissor(cmd, 0, 1, &scissor);
-      }
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              r.material->p_pipeline->layout, 1, 1,
-                              &r.material->ds, 0, nullptr);
-    }
-    if (r.index_buffer != last_index_buffer) {
-      last_index_buffer = r.index_buffer;
-      vkCmdBindIndexBuffer(cmd, r.index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    }
-    GPUDrawPushConstants push_const;
-    push_const.vertex_buffer_address = r.vertex_buffer_address;
-    push_const.world_mat = r.transform;
-    vkCmdPushConstants(cmd, r.material->p_pipeline->layout,
-                       VK_SHADER_STAGE_VERTEX_BIT, 0,
-                       sizeof(GPUDrawPushConstants), &push_const);
-    vkCmdDrawIndexed(cmd, r.n_index, 1, r.first_index, 0, 0);
-    stats.n_drawcalls += 1;
-    stats.n_triangles += r.n_index / 3;
-  };
-  VkRenderingAttachmentInfo color_attach = vkinit::attachmentInfo(
-      m_color_image.view, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRenderingAttachmentInfo depth_attach = vkinit::depthAttachmentInfo(
-      m_depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  VkRenderingInfo i_render =
-      vkinit::renderingInfo(m_draw_extent, &color_attach, &depth_attach);
-  vkCmdBeginRendering(cmd, &i_render);
-  {
-    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-    //                   m_simple_mesh_pipeline);
-    // Bind texture.
-    VkDescriptorSet image_ds = getCurrentFrame().frame_descriptors.allocate(
-        m_device, m_single_image_ds_layout);
-    {
-      DescriptorWriter writer;
-      writer.writeImage(0, m_error_image.view, m_default_sampler_nearest,
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.updateDescriptorSet(m_device, image_ds);
-    }
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            m_simple_mesh_pipeline_layout, 0, 1, &image_ds, 0,
-                            nullptr);
-
-    AllocatedBuffer gpu_scene_data_buffer =
-        createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VMA_MEMORY_USAGE_CPU_TO_GPU);
-    getCurrentFrame().deletion_queue.push(
-        [=, this]() { destroyBuffer(gpu_scene_data_buffer); });
-    GPUSceneData *scene_uniform_data =
-        (GPUSceneData *)gpu_scene_data_buffer.allocation->GetMappedData();
-    *scene_uniform_data = m_scene_data;
-    VkDescriptorSet frame_ds = getCurrentFrame().frame_descriptors.allocate(
-        m_device, m_GPU_scene_data_ds_layout);
-    {
-
-      DescriptorWriter writer;
-      writer.writeBuffer(0, gpu_scene_data_buffer.buffer, sizeof(GPUSceneData),
-                         0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-      writer.updateDescriptorSet(m_device, frame_ds);
-    }
-
-    // for (auto &r : m_main_draw_context.opaque_surfaces)
-    //   drawObjet(r, frame_ds);
-    for (auto &idx : opaque_index)
-      drawObjet(m_main_draw_context.opaque_surfaces[idx], frame_ds);
-    for (auto &r : m_main_draw_context.transparent_surfaces)
-      drawObjet(r, frame_ds);
-  }
-  vkCmdEndRendering(cmd);
-  m_main_draw_context.opaque_surfaces.clear();
-  m_main_draw_context.transparent_surfaces.clear();
-}
 void Engine::run() {
-  SDL_Event e;
   bool b_quit = false;
   while (!b_quit) {
     stats.t_frame.begin();
-
-    // Event handling.
-    while (SDL_PollEvent(&e) != 0) {
-      // Close the window when alt-f4 or the X button.
-      if (e.type == SDL_EVENT_QUIT)
-        b_quit = true;
-      if (e.type >= SDL_EVENT_WINDOW_FIRST && e.type <= SDL_EVENT_WINDOW_LAST) {
-        if (e.window.type == SDL_EVENT_WINDOW_MINIMIZED)
-          stop_rendering = true;
-        if (e.window.type == SDL_EVENT_WINDOW_RESTORED)
-          stop_rendering = false;
-      }
-      ImGui_ImplSDL3_ProcessEvent(&e);
-      auto &io = ImGui::GetIO();
-      if (io.WantCaptureMouse == false) // Imgui intercepting mouse.
-        m_main_camera.processSDLEvent(e);
-      if (e.type == SDL_EVENT_KEY_UP && e.key.key == SDLK_C)
-        m_capture = true;
-    }
-
-    // Overall render configure.
-    if (require_resize)
-      resizeSwapchain();
-    if (stop_rendering) {
-      // Throttle the speed to avoid the endless spinning.
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      continue;
-    }
-
-    // UI update.
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
-    {
-      if (ImGui::Begin("Panel")) {
-        ImGui::SliderFloat("Render Scale", &m_render_scale, 0.3f, 1.f);
-        auto &selected_pipeline = m_compute_pipelines[m_cur_comp_pipeline_idx];
-        ImGui::Text("Selected Compute Pipeline: %s", selected_pipeline.name);
-        ImGui::SliderInt("Effect Index", &m_cur_comp_pipeline_idx, 0,
-                         m_compute_pipelines.size() - 1);
-        ImGui::InputFloat4("data1", (float *)&selected_pipeline.data.data1);
-        ImGui::InputFloat4("data2", (float *)&selected_pipeline.data.data2);
-        ImGui::InputFloat4("data3", (float *)&selected_pipeline.data.data3);
-        ImGui::InputFloat4("data4", (float *)&selected_pipeline.data.data4);
-
-        float t_comp = static_cast<float>(m_timestamps[1] - m_timestamps[0]) *
-                       m_timestamp_period / 1000000.f;
-        float t_geom = static_cast<float>(m_timestamps[3] - m_timestamps[2]) *
-                       m_timestamp_period / 1000000.f;
-        float t_other = static_cast<float>(m_timestamps[5] - m_timestamps[4]) *
-                        m_timestamp_period / 1000000.f;
-        ImGui::Text("Stats:");
-        ImGui::Text("\t#triangles      %d", stats.n_triangles);
-        ImGui::Text("\t#drawcalls      %d", stats.n_drawcalls);
-        ImGui::Text("CPU time:");
-        ImGui::Text("\tframe time      %f ms", stats.t_frame.period_ms);
-        ImGui::Text("\tscene update    %f ms", stats.t_scene_update.period_ms);
-        ImGui::Text("\tCPU draw time   %f ms", stats.t_cpu_draw.period_ms);
-        ImGui::Text("GPU time:");
-        ImGui::Text("\tGPU compute     %f ms", t_comp);
-        ImGui::Text("\tGPU geometry    %f ms", t_geom);
-        ImGui::Text("\tGPU others      %f ms", t_other);
-
-        auto &cam_p = m_main_camera.position;
-        ImGui::Text("Camera:");
-        ImGui::Text("\tPosition (%.3f, %.3f, %.3f)", cam_p.x, cam_p.y, cam_p.z);
-        ImGui::Text("\tPitch    %.3f", m_main_camera.pitch);
-        ImGui::Text("\tYaw      %.3f", m_main_camera.yaw);
-      }
-      ImGui::End();
-    }
-    ImGui::Render();
-
     // Pipeline draw.
     draw();
+    b_quit = !m_capture;
     stats.t_frame.end();
   }
 }
@@ -494,8 +185,6 @@ void Engine::initVulkan() {
   vkb::Instance vkb_inst = inst_ret.value();
   m_instance = vkb_inst.instance;
   m_debug_msngr = vkb_inst.debug_messenger;
-
-  SDL_Vulkan_CreateSurface(window, m_instance, NULL, &m_surface);
 
   // Vulkan 1.3 features.
   VkPhysicalDeviceVulkan13Features features13{
@@ -517,9 +206,8 @@ void Engine::initVulkan() {
       selector.set_minimum_version(1, 3)
           .set_required_features_13(features13)
           .set_required_features_12(features12)
-          // For resetting query pool from host.
+          .require_present(false)
           .add_required_extension(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME)
-          .set_surface(m_surface)
           .select_devices();
   // Naive select by physical device property.
   if (phy_device_list.has_value()) {
@@ -576,10 +264,8 @@ void Engine::initVulkan() {
     vkDestroyInstance(m_instance, nullptr);
   });
 }
-void Engine::initSwapchain() {
-  fmt::print("init swapchain\n");
-  createSwapchain(window_extent.width, window_extent.height);
-
+void Engine::initImages() {
+  fmt::print("init images\n");
   // Custom draw image.
   VkExtent3D color_img_ext = {window_extent.width, window_extent.height, 1};
   VkImageUsageFlags color_img_usage = {};
@@ -604,7 +290,6 @@ void Engine::initSwapchain() {
   m_main_deletion_queue.push([&]() {
     destroyImage(m_color_image);
     destroyImage(m_depth_image);
-    destroySwapchain();
   });
 
   m_save_image = {};
@@ -653,23 +338,22 @@ void Engine::initCommands() {
   VkCommandPoolCreateInfo ci_cmd_pool = vkinit::cmdPoolCreateInfo(
       m_graphic_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-  for (uint32_t i = 0; i < kFrameOverlap; i++) {
-    VK_CHECK(vkCreateCommandPool(m_device, &ci_cmd_pool, nullptr,
-                                 &m_frames[i].cmd_pool));
-    VkCommandBufferAllocateInfo cmd_alloc_info =
-        vkinit::cmdBufferAllocInfo(m_frames[i].cmd_pool, 1);
-    VK_CHECK(vkAllocateCommandBuffers(m_device, &cmd_alloc_info,
-                                      &m_frames[i].cmd_buffer_main));
-  }
-
+  // Init compute cmd.
+  VK_CHECK(vkCreateCommandPool(m_device, &ci_cmd_pool, nullptr,
+                               &m_compute_cmd_pool));
+  VkCommandBufferAllocateInfo cmd_alloc_info =
+      vkinit::cmdBufferAllocInfo(m_compute_cmd_pool, 1);
+  VK_CHECK(vkAllocateCommandBuffers(m_device, &cmd_alloc_info, &m_compute_cmd));
   // Init immediate cmd.
   VK_CHECK(
       vkCreateCommandPool(m_device, &ci_cmd_pool, nullptr, &m_imm_cmd_pool));
-  VkCommandBufferAllocateInfo cmd_alloc_info =
-      vkinit::cmdBufferAllocInfo(m_imm_cmd_pool, 1);
+  cmd_alloc_info = vkinit::cmdBufferAllocInfo(m_imm_cmd_pool, 1);
   VK_CHECK(vkAllocateCommandBuffers(m_device, &cmd_alloc_info, &m_imm_cmd));
-  m_main_deletion_queue.push(
-      [&]() { vkDestroyCommandPool(m_device, m_imm_cmd_pool, nullptr); });
+
+  m_main_deletion_queue.push([&]() {
+    vkDestroyCommandPool(m_device, m_compute_cmd_pool, nullptr);
+    vkDestroyCommandPool(m_device, m_imm_cmd_pool, nullptr);
+  });
 }
 void Engine::initSyncStructures() {
   // One fence to control when the gpu has finished rendering the frame.
@@ -679,46 +363,13 @@ void Engine::initSyncStructures() {
   // The fence starts signalled so we can wait on it on the first frame.
   VkFenceCreateInfo ci_fence =
       vkinit::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-  VkSemaphoreCreateInfo ci_semaphore = vkinit::semaphoreCreateInfo();
 
-  for (uint32_t i = 0; i < kFrameOverlap; i++) {
-    VK_CHECK(
-        vkCreateFence(m_device, &ci_fence, nullptr, &m_frames[i].render_fence));
-    VK_CHECK(vkCreateSemaphore(m_device, &ci_semaphore, nullptr,
-                               &m_frames[i].swapchain_semaphore));
-    VK_CHECK(vkCreateSemaphore(m_device, &ci_semaphore, nullptr,
-                               &m_frames[i].render_semaphore));
-  }
+  VK_CHECK(vkCreateFence(m_device, &ci_fence, nullptr, &m_compute_fence));
   VK_CHECK(vkCreateFence(m_device, &ci_fence, nullptr, &m_imm_fence));
-  m_main_deletion_queue.push(
-      [&]() { vkDestroyFence(m_device, m_imm_fence, nullptr); });
-}
-void Engine::createSwapchain(int w, int h) {
-  vkb::SwapchainBuilder swapchainBuilder{m_chosen_GPU, m_device, m_surface};
-  m_swapchain_img_format = VK_FORMAT_B8G8R8A8_UNORM;
-  vkb::Swapchain vkbSwapchain =
-      swapchainBuilder
-          .set_desired_format(VkSurfaceFormatKHR{
-              .format = m_swapchain_img_format,
-              .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-          // use v-sync present mode
-          .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-          .set_desired_extent(w, h)
-          .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-          .build()
-          .value();
-
-  m_swapchain_extent = vkbSwapchain.extent;
-  m_swapchain = vkbSwapchain.swapchain;
-  m_swapchain_imgs = vkbSwapchain.get_images().value();
-  m_swapchain_img_views = vkbSwapchain.get_image_views().value();
-}
-void Engine::destroySwapchain() {
-  // Images are deleted here.
-  vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-  for (size_t i = 0; i < m_swapchain_img_views.size(); i++) {
-    vkDestroyImageView(m_device, m_swapchain_img_views[i], nullptr);
-  }
+  m_main_deletion_queue.push([&]() {
+    vkDestroyFence(m_device, m_compute_fence, nullptr);
+    vkDestroyFence(m_device, m_imm_fence, nullptr);
+  });
 }
 void Engine::initDescriptors() {
   std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {
@@ -758,26 +409,10 @@ void Engine::initDescriptors() {
     vkDestroyDescriptorSetLayout(m_device, m_GPU_scene_data_ds_layout, nullptr);
     vkDestroyDescriptorSetLayout(m_device, m_single_image_ds_layout, nullptr);
   });
-
-  for (size_t i = 0; i < kFrameOverlap; i++) {
-    std::vector<DescriptorAllocator::PoolSizeRatio> frame_sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
-    };
-    m_frames[i].frame_descriptors = {};
-    m_frames[i].frame_descriptors.initPool(m_device, 1000, frame_sizes);
-    m_main_deletion_queue.push(
-        [&, i]() { m_frames[i].frame_descriptors.destroyPools(m_device); });
-  }
 }
 void Engine::initPipelines() {
   // Compute pipelines.
   initBackgroundPipelines();
-  // Graphics pipelines.
-  initSimpleMeshPipeline();
-  m_metal_rough_mat.buildPipelines(this);
 }
 void Engine::initBackgroundPipelines() {
   VkPushConstantRange push_range = {};
@@ -882,50 +517,6 @@ void Engine::initBackgroundPipelines() {
     }
   });
 }
-void Engine::initSimpleMeshPipeline() {
-  VkShaderModule mesh_shader_vert;
-  VkShaderModule mesh_shader_frag;
-  if (!vkutil::loadShaderModule("../../assets/shaders/simple_mesh.vert.spv",
-                                m_device, &mesh_shader_vert)) {
-    fmt::println("Error loading vert shader.");
-  }
-  if (!vkutil::loadShaderModule("../../assets/shaders/texture_image.frag.spv",
-                                m_device, &mesh_shader_frag)) {
-    fmt::println("Error loading frag shader.");
-  }
-  VkPushConstantRange buffer_range = {};
-  buffer_range.offset = 0;
-  buffer_range.size = sizeof(GPUDrawPushConstants);
-  buffer_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  VkPipelineLayoutCreateInfo ci_pipeline_layout =
-      vkinit::pipelineLayoutCreateInfo();
-  ci_pipeline_layout.pPushConstantRanges = &buffer_range;
-  ci_pipeline_layout.pushConstantRangeCount = 1;
-  ci_pipeline_layout.pSetLayouts = &m_single_image_ds_layout;
-  ci_pipeline_layout.setLayoutCount = 1;
-  VK_CHECK(vkCreatePipelineLayout(m_device, &ci_pipeline_layout, nullptr,
-                                  &m_simple_mesh_pipeline_layout));
-  PipelineBuilder builder;
-  builder.pipeline_layout = m_simple_mesh_pipeline_layout;
-  builder.setShaders(mesh_shader_vert, mesh_shader_frag);
-  builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  builder.setPolygonMode(VK_POLYGON_MODE_FILL);
-  builder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-  builder.setMultisamplingNone();
-  // builder.disableBlending();
-  builder.enableBlendingAlpha();
-  builder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-  builder.setColorAttachFormat(m_color_image.format);
-  builder.setDepthFormat(m_depth_image.format);
-  m_simple_mesh_pipeline = builder.buildPipeline(m_device);
-
-  vkDestroyShaderModule(m_device, mesh_shader_vert, nullptr);
-  vkDestroyShaderModule(m_device, mesh_shader_frag, nullptr);
-  m_main_deletion_queue.push([&]() {
-    vkDestroyPipelineLayout(m_device, m_simple_mesh_pipeline_layout, nullptr);
-    vkDestroyPipeline(m_device, m_simple_mesh_pipeline, nullptr);
-  });
-}
 
 void Engine::immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func) {
   VK_CHECK(vkResetFences(m_device, 1, &m_imm_fence));
@@ -948,74 +539,6 @@ void Engine::immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func) {
   VK_CHECK(vkWaitForFences(m_device, 1, &m_imm_fence, true, VK_ONE_SEC));
 }
 
-void Engine::initImGui() {
-  // 1: create descriptor pool for IMGUI.
-  // Sizes are oversize, but copied from imgui demo itself.
-  VkDescriptorPoolSize pool_sizes[] = {
-      {VK_DESCRIPTOR_TYPE_SAMPLER, 100},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100},
-      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
-      {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
-      {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 100},
-      {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 100},
-      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100},
-      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100},
-      {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 100}};
-
-  VkDescriptorPoolCreateInfo pool_info = {};
-  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  pool_info.maxSets = 100;
-  pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
-  pool_info.pPoolSizes = pool_sizes;
-
-  VkDescriptorPool imgui_pool;
-  VK_CHECK(vkCreateDescriptorPool(m_device, &pool_info, nullptr, &imgui_pool));
-
-  // 2: initialize imgui library
-  // Init the core structures of imgui
-  ImGui::CreateContext();
-  // Init imgui for SDL
-  ImGui_ImplSDL3_InitForVulkan(window);
-  // Init info of imgui for Vulkan
-  ImGui_ImplVulkan_InitInfo init_info = {};
-  init_info.Instance = m_instance;
-  init_info.PhysicalDevice = m_chosen_GPU;
-  init_info.Device = m_device;
-  init_info.Queue = m_graphic_queue;
-  init_info.DescriptorPool = imgui_pool;
-  init_info.MinImageCount = 3;
-  init_info.ImageCount = 3;
-  init_info.UseDynamicRendering = true;
-  // Dynamic rendering parameters for imgui to use.
-  init_info.PipelineRenderingCreateInfo = {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-  // GUI is drawn directly into swapchain.
-  init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats =
-      &m_swapchain_img_format;
-  init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-  ImGui_ImplVulkan_Init(&init_info);
-  ImGui_ImplVulkan_CreateFontsTexture();
-  // Pool value changes if capture using reference,
-  // will cause validation layer to report.
-  m_main_deletion_queue.push([this, imgui_pool]() {
-    ImGui_ImplVulkan_Shutdown();
-    vkDestroyDescriptorPool(m_device, imgui_pool, nullptr);
-  });
-}
-void Engine::drawImGui(VkCommandBuffer cmd, VkImageView target_img_view) {
-  VkRenderingAttachmentInfo color_attachment = vkinit::attachmentInfo(
-      target_img_view, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-  VkRenderingInfo render_info =
-      vkinit::renderingInfo(m_swapchain_extent, &color_attachment, nullptr);
-
-  vkCmdBeginRendering(cmd, &render_info);
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-  vkCmdEndRendering(cmd);
-}
 AllocatedBuffer Engine::createBuffer(size_t alloc_size,
                                      VkBufferUsageFlags usage,
                                      VmaMemoryUsage mem_usage) {
@@ -1059,7 +582,8 @@ GPUMeshBuffers Engine::uploadMesh(std::span<uint32_t> indices,
                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                    VMA_MEMORY_USAGE_GPU_ONLY);
 
-  // Write data into a CPU-only staging buffer, then upload to GPU-only buffer.
+  // Write data into a CPU-only staging buffer, then upload to GPU-only
+  // buffer.
   AllocatedBuffer staging =
       createBuffer(kVertexBufferSize + kIndexBufferSize,
                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
@@ -1084,124 +608,8 @@ GPUMeshBuffers Engine::uploadMesh(std::span<uint32_t> indices,
   return mesh;
 }
 
-void Engine::initDefaultData() {
-  // std::array<Vertex, 4> rect_vertices;
-  // rect_vertices[0].position = {0.5, -0.5, 0};
-  // rect_vertices[1].position = {0.5, 0.5, 0};
-  // rect_vertices[2].position = {-0.5, -0.5, 0};
-  // rect_vertices[3].position = {-0.5, 0.5, 0};
-  // rect_vertices[0].color = {0.8, 0.2, 0.2, 1};
-  // rect_vertices[1].color = {0.2, 0.8, 0.2, 1};
-  // rect_vertices[2].color = {0.2, 0.2, 0.8, 1};
-  // rect_vertices[3].color = {0.8, 0.8, 0.8, 1};
+void Engine::initDefaultData() {}
 
-  // std::array<uint32_t, 6> rect_indices;
-  // rect_indices[0] = 0;
-  // rect_indices[1] = 1;
-  // rect_indices[2] = 2;
-  // rect_indices[3] = 2;
-  // rect_indices[4] = 1;
-  // rect_indices[5] = 3;
-
-  // m_simple_mesh = uploadMesh(rect_indices, rect_vertices);
-  // m_main_deletion_queue.push([&]() {
-  //   destroyBuffer(m_simple_mesh.index_buffer);
-  //   destroyBuffer(m_simple_mesh.vertex_buffer);
-  // });
-
-  // m_meshes = loadGltfMeshes(this,
-  // "../../assets/models/basic_mesh.glb").value(); for (auto &&mesh : m_meshes)
-  // {
-  //   m_main_deletion_queue.push([&]() {
-  //     destroyBuffer(mesh->mesh_buffers.vertex_buffer);
-  //     destroyBuffer(mesh->mesh_buffers.index_buffer);
-  //   });
-  // }
-
-  uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
-  m_white_image =
-      createImage((void *)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                  VK_IMAGE_USAGE_SAMPLED_BIT);
-  uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
-  m_black_image =
-      createImage((void *)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                  VK_IMAGE_USAGE_SAMPLED_BIT);
-  uint32_t gray = glm::packUnorm4x8(glm::vec4(0.66f, 0.66f, 0.66f, 1));
-  m_gray_image =
-      createImage((void *)&gray, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                  VK_IMAGE_USAGE_SAMPLED_BIT);
-  uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
-  std::array<uint32_t, 16 * 16> pixels; // 16x16 checkerboard texture.
-  for (int x = 0; x < 16; x++)
-    for (int y = 0; y < 16; y++)
-      pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-  m_error_image =
-      createImage(pixels.data(), VkExtent3D{16, 16, 1},
-                  VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-
-  VkSamplerCreateInfo ci_sampler = {
-      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-  };
-  ci_sampler.magFilter = VK_FILTER_LINEAR;
-  ci_sampler.minFilter = VK_FILTER_LINEAR;
-  vkCreateSampler(m_device, &ci_sampler, nullptr, &m_default_sampler_linear);
-  ci_sampler.magFilter = VK_FILTER_NEAREST;
-  ci_sampler.minFilter = VK_FILTER_NEAREST;
-  vkCreateSampler(m_device, &ci_sampler, nullptr, &m_default_sampler_nearest);
-
-  m_main_deletion_queue.push([&]() {
-    vkDestroySampler(m_device, m_default_sampler_linear, nullptr);
-    vkDestroySampler(m_device, m_default_sampler_nearest, nullptr);
-
-    destroyImage(m_white_image);
-    destroyImage(m_black_image);
-    destroyImage(m_gray_image);
-    destroyImage(m_error_image);
-  });
-
-  // GLTFMetallicRoughness::MaterialResources mat_res;
-  // mat_res.color_image = m_white_image;
-  // mat_res.color_sampler = m_default_sampler_linear;
-  // mat_res.metal_rough_image = m_white_image;
-  // mat_res.metal_rough_sampler = m_default_sampler_linear;
-  // AllocatedBuffer mat_const = createBuffer(
-  //     sizeof(GLTFMetallicRoughness::MaterialConstants),
-  //     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  // GLTFMetallicRoughness::MaterialConstants *scene_uniform =
-  //     (GLTFMetallicRoughness::MaterialConstants *)
-  //         mat_const.allocation->GetMappedData();
-  // scene_uniform->color_factors = glm::vec4{1, 1, 1, 1};
-  // scene_uniform->metal_rough_factors = glm::vec4{1, 0.5, 0, 0};
-  // m_main_deletion_queue.push([=, this]() { destroyBuffer(mat_const); });
-  // mat_res.data_buffer = mat_const.buffer;
-  // mat_res.data_buffer_offset = 0;
-  // m_default_material = m_metal_rough_mat.writeMaterial(
-  //     m_device, MaterialPass::BasicMainColor, mat_res,
-  //     m_global_ds_allocator);
-
-  // for (auto &m : m_meshes) {
-  //   std::shared_ptr<MeshNode> node = std::make_shared<MeshNode>();
-  //   node->mesh = m;
-  //   node->transform_local = glm::mat4{1.f};
-  //   node->transform_world = glm::mat4{1.f};
-  //   for (auto &s : node->mesh->surfaces)
-  //     s.material = std::make_shared<GLTFMaterial>(m_default_mat);
-  //   m_loaded_nodes[m->name] = std::move(node);
-  // }
-
-  std::string structurePath = {"../../assets/models/structure.glb"};
-  auto structureFile = loadGltf(this, structurePath);
-  assert(structureFile.has_value());
-  m_loaded_scenes["structure"] = *structureFile;
-}
-void Engine::resizeSwapchain() {
-  vkDeviceWaitIdle(m_device);
-  destroySwapchain();
-  int w, h;
-  SDL_GetWindowSize(window, &w, &h);
-  createSwapchain(w, h);
-  require_resize = false;
-}
 AllocatedImage Engine::createImage(VkExtent3D size, VkFormat format,
                                    VkImageUsageFlags usage, bool mipmap) {
   AllocatedImage image;
@@ -1274,131 +682,4 @@ void Engine::destroyImage(const AllocatedImage &image) {
   vkDestroyImageView(m_device, image.view, nullptr);
   vmaDestroyImage(m_allocator, image.image, image.allocation);
 }
-void Engine::updateScene() {
-  m_scene_data.prev_view_proj = m_scene_data.view_proj;
-  m_main_camera.update();
-  m_main_draw_context.opaque_surfaces.clear();
-  m_main_draw_context.transparent_surfaces.clear();
-
-  // m_loaded_nodes["Suzanne"]->draw(glm::mat4{1.f}, m_main_draw_context);
-  // for (int x = -3; x < 3; x++) {
-  //   glm::mat4 scale = glm::scale(glm::vec3{0.2});
-  //   glm::mat4 translation = glm::translate(glm::vec3{x + 0.5, 1, 0});
-  //   m_loaded_nodes["Cube"]->draw(translation * scale, m_main_draw_context);
-  // }
-  m_loaded_scenes["structure"]->draw(glm::mat4{1.f}, m_main_draw_context);
-
-  m_scene_data.view = m_main_camera.getViewMatrix();
-  m_scene_data.proj = glm::perspective(
-      glm::radians(70.f), 1.f * window_extent.width / window_extent.height,
-      0.1f, 10000.f);
-  m_scene_data.proj[1][1] *= -1;
-  m_scene_data.view_proj = m_scene_data.proj * m_scene_data.view;
-  m_scene_data.ambient_color = glm::vec4(.1f);
-  m_scene_data.sunlight_color = glm::vec4(1.f);
-  m_scene_data.sunlight_dir = glm::vec4(0, 1, 0.5, 1.f);
-}
-void GLTFMetallicRoughness::buildPipelines(Engine *engine) {
-  VkShaderModule mesh_frag_shader;
-  if (!vkutil::loadShaderModule("../../assets/shaders/mesh.frag.spv",
-                                engine->m_device, &mesh_frag_shader)) {
-    fmt::println("Error when building the triangle fragment shader module");
-  }
-  VkShaderModule mesh_vert_shader;
-  if (!vkutil::loadShaderModule("../../assets/shaders/mesh.vert.spv",
-                                engine->m_device, &mesh_vert_shader)) {
-    fmt::println("Error when building the triangle vertex shader module");
-  }
-
-  VkPushConstantRange range{};
-  range.offset = 0;
-  range.size = sizeof(GPUDrawPushConstants);
-  range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-  DescriptorLayoutBuilder ds_layout_builder;
-  ds_layout_builder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  ds_layout_builder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  ds_layout_builder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  ds_layout = ds_layout_builder.build(engine->m_device,
-                                      VK_SHADER_STAGE_VERTEX_BIT |
-                                          VK_SHADER_STAGE_FRAGMENT_BIT);
-  VkDescriptorSetLayout layouts[] = {engine->m_GPU_scene_data_ds_layout,
-                                     ds_layout};
-
-  VkPipelineLayoutCreateInfo ci_pipeline_layout =
-      vkinit::pipelineLayoutCreateInfo();
-  ci_pipeline_layout.setLayoutCount = 2;
-  ci_pipeline_layout.pSetLayouts = layouts;
-  ci_pipeline_layout.pPushConstantRanges = &range;
-  ci_pipeline_layout.pushConstantRangeCount = 1;
-  VkPipelineLayout layout;
-  VK_CHECK(vkCreatePipelineLayout(engine->m_device, &ci_pipeline_layout,
-                                  nullptr, &layout));
-  // Same layout but different configure.
-  pipeline_opaque.layout = layout;
-  pipeline_transparent.layout = layout;
-
-  PipelineBuilder pipeline_builder;
-  pipeline_builder.setShaders(mesh_vert_shader, mesh_frag_shader);
-  pipeline_builder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  pipeline_builder.setPolygonMode(VK_POLYGON_MODE_FILL);
-  pipeline_builder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-  pipeline_builder.setMultisamplingNone();
-  pipeline_builder.disableBlending();
-  pipeline_builder.enableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-  pipeline_builder.setColorAttachFormat(engine->m_color_image.format);
-  pipeline_builder.setDepthFormat(engine->m_depth_image.format);
-  pipeline_builder.pipeline_layout = layout;
-  pipeline_opaque.pipeline = pipeline_builder.buildPipeline(engine->m_device);
-  pipeline_builder.enableBlendingAdd();
-  pipeline_builder.enableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
-  pipeline_transparent.pipeline =
-      pipeline_builder.buildPipeline(engine->m_device);
-
-  vkDestroyShaderModule(engine->m_device, mesh_frag_shader, nullptr);
-  vkDestroyShaderModule(engine->m_device, mesh_vert_shader, nullptr);
-}
-void GLTFMetallicRoughness::clearResources(VkDevice device) {
-  vkDestroyDescriptorSetLayout(device, ds_layout, nullptr);
-  // Same layout.
-  vkDestroyPipelineLayout(device, pipeline_transparent.layout, nullptr);
-  vkDestroyPipeline(device, pipeline_opaque.pipeline, nullptr);
-  vkDestroyPipeline(device, pipeline_transparent.pipeline, nullptr);
-}
-
-MaterialInstance
-GLTFMetallicRoughness::writeMaterial(VkDevice device, MaterialPass pass,
-                                     const MaterialResources &resources,
-                                     DescriptorAllocator &d_allocator) {
-  MaterialInstance mat_data;
-  mat_data.pass_type = pass;
-  switch (pass) {
-  case MaterialPass::BasicMainColor:
-    mat_data.p_pipeline = &pipeline_opaque;
-    break;
-  case MaterialPass::BasicTransparent:
-    mat_data.p_pipeline = &pipeline_transparent;
-    break;
-  case MaterialPass::Others:
-    fmt::println("Other material.");
-    mat_data.p_pipeline = &pipeline_opaque;
-    break;
-  }
-
-  mat_data.ds = d_allocator.allocate(device, ds_layout);
-
-  writer.clear();
-  writer.writeBuffer(0, resources.data_buffer, sizeof(MaterialConstants),
-                     resources.data_buffer_offset,
-                     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  writer.writeImage(1, resources.color_image.view, resources.color_sampler,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.writeImage(2, resources.metal_rough_image.view,
-                    resources.metal_rough_sampler,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.updateDescriptorSet(device, mat_data.ds);
-
-  return mat_data;
-}
+void Engine::updateScene() {}
