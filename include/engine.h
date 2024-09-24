@@ -33,6 +33,20 @@ struct ComputePipeline {
   ComputePushConstants data;
 };
 
+struct ComputeTask {
+  /**
+   * Input: all FP32 data.
+   *  path to data
+   *  ready for memcpy and buffer upload.
+   * Output: all FP32 data.
+   *  path, name, index.
+   *
+   */
+  std::string input_0;
+  std::string input_1;
+  std::string output_0;
+};
+
 struct Timer {
   float period_ms;
   std::chrono::time_point<std::chrono::system_clock> start_point;
@@ -60,68 +74,45 @@ public:
   void run();
   void draw();
   void cleanup();
-  void immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func);
 
   bool stop_rendering{false};
   bool is_initialized{false};
-  int frame_number{0};
+  int task_number{0};
   VkExtent2D window_extent{1920, 1080};
   EngineStats stats;
 
   static Engine &get();
 
-  /// @brief Create GPU-only image.
-  AllocatedImage createImage(VkExtent3D size, VkFormat format,
-                             VkImageUsageFlags usage, bool mipmap = false);
-  /// @brief Create GPU-only image with data.
-  AllocatedImage createImage(void *data, VkExtent3D size, VkFormat format,
-                             VkImageUsageFlags usage, bool mipmap = false);
-  void destroyImage(const AllocatedImage &image);
-
 private:
-  // TODO Better visibility.
   VkInstance m_instance;                  // Vulkan library handle
   VkDebugUtilsMessengerEXT m_debug_msngr; // Vulkan debug output handle
   VkPhysicalDevice m_chosen_GPU;          // GPU chosen as the default device
   VkDevice m_device;                      // Vulkan device for commands
 
   VkExtent2D m_draw_extent;
-  float m_render_scale = 1.f;
 
-  VkDescriptorSetLayout m_GPU_scene_data_ds_layout;
-  VkQueue m_graphic_queue;
-  uint32_t m_graphic_queue_family;
+  VkQueue m_compute_queue;
+  uint32_t m_compute_queue_family;
 
   DeletionQueue m_main_deletion_queue;
-
   VmaAllocator m_allocator;
 
-  // Input images.
-  AllocatedImage m_white_image;
-  AllocatedImage m_black_image;
-  AllocatedImage m_gray_image;
-  AllocatedImage m_error_image;
-  VkSampler m_default_sampler_linear;
-  VkSampler m_default_sampler_nearest;
-  VkDescriptorSetLayout m_single_image_ds_layout;
-  // Output images.
-  AllocatedImage m_color_image;
-  AllocatedImage m_depth_image;
-  AllocatedImage m_save_image;
+  // Input.
+  AllocatedBuffer m_input_0;
+  VkDescriptorSet m_input_0_ds;
+  VkDescriptorSetLayout m_input_0_ds_layout;
+  // Output.
+  AllocatedBuffer m_output_0;
+  VkDescriptorSet m_output_0_ds;
+  VkDescriptorSetLayout m_output_0_ds_layout;
+  AllocatedBuffer m_readback_0;
+  VkDescriptorSet m_readback_0_ds;
+  VkDescriptorSetLayout m_readback_0_ds_layout;
 
   DescriptorAllocator m_global_ds_allocator;
-  VkDescriptorSet m_draw_image_ds;
-  VkDescriptorSetLayout m_draw_image_ds_layout;
 
-  VkPipelineLayout m_compute_pipeline_layout;
-  std::vector<ComputePipeline> m_compute_pipelines;
-  int m_cur_comp_pipeline_idx = 2;
-
-  void updateScene();
-
-  VkFence m_imm_fence;
-  VkCommandBuffer m_imm_cmd;
-  VkCommandPool m_imm_cmd_pool;
+  VkPipelineLayout m_compute_layout;
+  ComputePipeline m_compute_pipeline;
 
   VkFence m_compute_fence;
   VkCommandBuffer m_compute_cmd;
@@ -130,22 +121,27 @@ private:
   VkQueryPool m_query_pool_timestamp;
   std::vector<uint64_t> m_timestamps;
   float m_timestamp_period;
-  bool m_capture = true;
+  std::vector<ComputeTask> m_tasks;
 
 private:
   void initVulkan();
-  void initImages();
+  void initBuffers();
   void initCommands();
   void initSyncStructures();
 
   void initDescriptors();
   void initPipelines();
-  void initBackgroundPipelines();
+  void initComputePipelines();
   void initDefaultData();
 
-  void drawBackground(VkCommandBuffer cmd);
+  ComputeTask &getCurrentTask() { return m_tasks[task_number]; }
 
-  AllocatedBuffer createBuffer(size_t alloc_size, VkBufferUsageFlags usage,
-                               VmaMemoryUsage mem_usage);
+  void updateInput(VkCommandBuffer cmd);
+  void doCompute(VkCommandBuffer cmd);
+  void getResult(VkCommandBuffer cmd);
+
+  AllocatedBuffer createBuffer(
+      size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage,
+      VmaAllocationCreateFlagBits mem_alloc = VMA_ALLOCATION_CREATE_MAPPED_BIT);
   void destroyBuffer(const AllocatedBuffer &buffer);
 };

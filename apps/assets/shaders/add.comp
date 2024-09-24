@@ -1,0 +1,24 @@
+#version 450
+layout(local_size_x = 256)in;
+
+layout(set = 0, binding = 0)buffer InputBuffer {
+  float data[];
+} input_0;
+
+layout(set = 1, binding = 0)buffer OutputBuffer {
+  float data[];
+} output_0;
+
+layout(push_constant)uniform PushConstants {
+  vec4 data1;
+  vec4 data2;
+  vec4 data3;
+  vec4 data4;
+} constants;
+
+void main() {
+  uint gID = gl_GlobalInvocationID.x;
+  float val = input_0.data[gID];
+  val += 3.14f;
+  output_0.data[gID] = val;
+}

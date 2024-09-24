@@ -12,8 +12,8 @@ Render pass and dynamic rendering.
 
 ## Function
 
-- [ ] data processing structure
 - [ ] detailed compute pipeline for data processing
   - [ ] Pure compute pipeline. Imm submit is unnecessary.
   - [ ] Shader IO with format all FP32.
+- [ ] data processing structure
 - [ ] Multithreading.

@@ -15,6 +15,7 @@
       "mipmap",
       "Multisample",
       "Multisampling",
+      "readback",
       "Renderable",
       "setbind",
       "Spirv",

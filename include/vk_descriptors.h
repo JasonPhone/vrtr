@@ -60,6 +60,10 @@ private:
   static constexpr uint32_t kMaxNSetsPerPool = 4096;
 };
 
+/**
+ * @brief Write descriptor info into descriptorset.
+ * @note  For all descriptors, not just writable ones.
+ */
 class DescriptorWriter {
 public:
   void writeImage(int binding, VkImageView image, VkSampler sampler,
