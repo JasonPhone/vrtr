@@ -48,8 +48,8 @@ void Engine::cleanup() {
   loaded_engine = nullptr;
 }
 
-void Engine::draw() {
-  fmt::println("draw");
+void Engine::process() {
+  fmt::println("process");
   stats.t_cpu_draw.begin();
   VK_CHECK(vkWaitForFences(m_device, 1, &m_compute_fence, true, VK_ONE_SEC));
   VK_CHECK(vkResetFences(m_device, 1, &m_compute_fence));
@@ -66,7 +66,7 @@ void Engine::draw() {
     // Upload input.
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                         m_query_pool_timestamp, 0);
-    updateInput(cmd);
+    updateInput();
     vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         m_query_pool_timestamp, 1);
     // Process.
@@ -99,16 +99,27 @@ void Engine::draw() {
 
   // Read from CPU.
   vkDeviceWaitIdle(m_device);
-  auto data = (const float *)m_readback_0.alloc_info.pMappedData;
-  for (size_t i = 0; i < 10; i++)
-    fmt::print("{} ", data[i]);
-  fmt::print("\n");
+  for (auto &buffer : m_readback_buffers) {
+    auto data = (const float *)buffer.alloc_info.pMappedData;
+    for (size_t i = 0; i < 10; i++)
+      fmt::print("{} ", data[i]);
+    fmt::print("\n");
+  }
 }
 void Engine::run() {
   for (const auto &task : m_tasks) {
     stats.t_frame.begin();
-    draw();
+    process();
     stats.t_frame.end();
+    float t_input = static_cast<float>(m_timestamps[1] - m_timestamps[0]) *
+                    m_timestamp_period / 1000000.f;
+    float t_compute = static_cast<float>(m_timestamps[3] - m_timestamps[2]) *
+                      m_timestamp_period / 1000000.f;
+    float t_readback = static_cast<float>(m_timestamps[5] - m_timestamps[4]) *
+                       m_timestamp_period / 1000000.f;
+    fmt::println("input   \t{}ms", t_input);
+    fmt::println("compute \t{}ms", t_compute);
+    fmt::println("readback\t{}ms", t_readback);
     task_number++;
   }
 }
@@ -203,43 +214,64 @@ void Engine::initVulkan() {
   });
 }
 void Engine::initBuffers() {
-  m_input_0 = createBuffer(1024 * sizeof(float),
-                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                           VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                           VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
-  m_output_0 = createBuffer(1024 * sizeof(float),
-                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                            VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
-  m_readback_0 = createBuffer(
-      1024 * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-      VMA_MEMORY_USAGE_AUTO,
-      VmaAllocationCreateFlagBits(VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
-                                  VMA_ALLOCATION_CREATE_MAPPED_BIT));
+  m_input_buffers.clear();
+  m_output_buffers.clear();
+  m_readback_buffers.clear();
+  for (size_t i = 0; i < kNInputBuffers; i++) {
+    auto buffer = createBuffer(1024 * sizeof(float),
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
+    m_input_buffers.push_back(buffer);
+  }
+  for (size_t i = 0; i < kNOutputBuffers; i++) {
+    auto buffer = createBuffer(1024 * sizeof(float),
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                               VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                               VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
+    m_output_buffers.push_back(buffer);
+    buffer =
+        createBuffer(1024 * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                     VMA_MEMORY_USAGE_AUTO,
+                     VmaAllocationCreateFlagBits(
+                         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+                         VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    m_readback_buffers.push_back(buffer);
+  }
+  fmt::println("#input buffers {}", m_input_buffers.size());
+  fmt::println("#output buffers {}", m_output_buffers.size());
+  fmt::println("#readback buffers {}", m_readback_buffers.size());
+
   m_main_deletion_queue.push([&]() {
-    destroyBuffer(m_input_0);
-    destroyBuffer(m_output_0);
-    destroyBuffer(m_readback_0);
+    for (auto &buffer : m_input_buffers)
+      destroyBuffer(buffer);
+    for (auto &buffer : m_output_buffers)
+      destroyBuffer(buffer);
+    for (auto &buffer : m_readback_buffers)
+      destroyBuffer(buffer);
   });
 }
 void Engine::initCommands() {
   fmt::print("init commands\n");
-  // Create a command pool for commands submitted to the graphics queue.
-  // We also want the pool to allow for resetting of individual command buffers
   VkCommandPoolCreateInfo ci_cmd_pool = vkinit::cmdPoolCreateInfo(
       m_compute_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
-  // Init compute cmd.
   VK_CHECK(vkCreateCommandPool(m_device, &ci_cmd_pool, nullptr,
                                &m_compute_cmd_pool));
   VkCommandBufferAllocateInfo cmd_alloc_info =
       vkinit::cmdBufferAllocInfo(m_compute_cmd_pool, 1);
   VK_CHECK(vkAllocateCommandBuffers(m_device, &cmd_alloc_info, &m_compute_cmd));
 
-  m_main_deletion_queue.push(
-      [&]() { vkDestroyCommandPool(m_device, m_compute_cmd_pool, nullptr); });
+  VK_CHECK(
+      vkCreateCommandPool(m_device, &ci_cmd_pool, nullptr, &m_imm_cmd_pool));
+  cmd_alloc_info = vkinit::cmdBufferAllocInfo(m_imm_cmd_pool, 1);
+  VK_CHECK(vkAllocateCommandBuffers(m_device, &cmd_alloc_info, &m_imm_cmd));
+
+  m_main_deletion_queue.push([&]() {
+    vkDestroyCommandPool(m_device, m_compute_cmd_pool, nullptr);
+    vkDestroyCommandPool(m_device, m_imm_cmd_pool, nullptr);
+  });
 }
 void Engine::initSyncStructures() {
   // One fence to control when the gpu has finished rendering the frame.
@@ -251,10 +283,10 @@ void Engine::initSyncStructures() {
       vkinit::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
 
   VK_CHECK(vkCreateFence(m_device, &ci_fence, nullptr, &m_compute_fence));
-  // VK_CHECK(vkCreateFence(m_device, &ci_fence, nullptr, &m_imm_fence));
+  VK_CHECK(vkCreateFence(m_device, &ci_fence, nullptr, &m_imm_fence));
   m_main_deletion_queue.push([&]() {
     vkDestroyFence(m_device, m_compute_fence, nullptr);
-    // vkDestroyFence(m_device, m_imm_fence, nullptr);
+    vkDestroyFence(m_device, m_imm_fence, nullptr);
   });
 }
 void Engine::initDescriptors() {
@@ -265,32 +297,33 @@ void Engine::initDescriptors() {
 
   {
     DescriptorLayoutBuilder builder;
-    builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    m_input_0_ds_layout = builder.build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
-    m_input_0_ds =
-        m_global_ds_allocator.allocate(m_device, m_input_0_ds_layout);
     DescriptorWriter writer;
-    writer.writeBuffer(0, m_input_0.buffer, 1024 * sizeof(float), 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    writer.updateDescriptorSet(m_device, m_input_0_ds);
+    for (size_t i = 0; i < m_input_buffers.size(); i++) {
+      builder.addBinding(i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+      writer.writeBuffer(i, m_input_buffers[i].buffer, 1024 * sizeof(float), 0,
+                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    }
+    m_input_ds_layout = builder.build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
+    m_input_ds = m_global_ds_allocator.allocate(m_device, m_input_ds_layout);
+    writer.updateDescriptorSet(m_device, m_input_ds);
   }
-
   {
     DescriptorLayoutBuilder builder;
-    builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    m_output_0_ds_layout = builder.build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
-    m_output_0_ds =
-        m_global_ds_allocator.allocate(m_device, m_output_0_ds_layout);
     DescriptorWriter writer;
-    writer.writeBuffer(0, m_output_0.buffer, 1024 * sizeof(float), 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    writer.updateDescriptorSet(m_device, m_output_0_ds);
+    for (size_t i = 0; i < m_output_buffers.size(); i++) {
+      builder.addBinding(i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+      writer.writeBuffer(i, m_output_buffers[i].buffer, 1024 * sizeof(float), 0,
+                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    }
+    m_output_ds_layout = builder.build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
+    m_output_ds = m_global_ds_allocator.allocate(m_device, m_output_ds_layout);
+    writer.updateDescriptorSet(m_device, m_output_ds);
   }
 
   m_main_deletion_queue.push([&]() {
     m_global_ds_allocator.destroyPools(m_device);
-    vkDestroyDescriptorSetLayout(m_device, m_input_0_ds_layout, nullptr);
-    vkDestroyDescriptorSetLayout(m_device, m_output_0_ds_layout, nullptr);
+    vkDestroyDescriptorSetLayout(m_device, m_input_ds_layout, nullptr);
+    vkDestroyDescriptorSetLayout(m_device, m_output_ds_layout, nullptr);
   });
 }
 void Engine::initPipelines() {
@@ -298,8 +331,7 @@ void Engine::initPipelines() {
   initComputePipelines();
 }
 void Engine::initComputePipelines() {
-  VkDescriptorSetLayout layouts[2] = {m_input_0_ds_layout,
-                                      m_output_0_ds_layout};
+  VkDescriptorSetLayout layouts[2] = {m_input_ds_layout, m_output_ds_layout};
   VkPushConstantRange push_range = {};
   push_range.offset = 0;
   push_range.size = sizeof(ComputePushConstants);
@@ -369,7 +401,11 @@ void Engine::destroyBuffer(const AllocatedBuffer &buffer) {
 
 void Engine::initDefaultData() {}
 
-void Engine::updateInput(VkCommandBuffer cmd) {
+void Engine::updateInput() {
+  VkBufferCopy copy;
+  copy.srcOffset = 0;
+  copy.dstOffset = 0;
+  copy.size = 1024 * sizeof(float);
   AllocatedBuffer staging =
       createBuffer(1024 * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                    VMA_MEMORY_USAGE_AUTO,
@@ -377,22 +413,29 @@ void Engine::updateInput(VkCommandBuffer cmd) {
                        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
                        VMA_ALLOCATION_CREATE_MAPPED_BIT));
   float *data = new float[1024];
+
   std::fill(data, data + 1024, 3.14f);
   memcpy(staging.alloc_info.pMappedData, data, 1024 * sizeof(float));
-  VkBufferCopy copy;
-  copy.srcOffset = 0;
-  copy.dstOffset = 0;
-  copy.size = 1024 * sizeof(float);
-  vkCmdCopyBuffer(cmd, staging.buffer, m_input_0.buffer, 1, &copy);
+  immediateSubmit([&](VkCommandBuffer _cmd) {
+    vkCmdCopyBuffer(_cmd, staging.buffer, m_input_buffers[0].buffer, 1, &copy);
+  });
+
+  std::fill(data, data + 1024, 2.72f);
+  memcpy(staging.alloc_info.pMappedData, data, 1024 * sizeof(float));
+  immediateSubmit([&](VkCommandBuffer _cmd) {
+    vkCmdCopyBuffer(_cmd, staging.buffer, m_input_buffers[1].buffer, 1, &copy);
+  });
+
+  delete[] data;
   destroyBuffer(staging);
 }
 void Engine::doCompute(VkCommandBuffer cmd) {
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                     m_compute_pipeline.pipeline);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_layout,
-                          0, 1, &m_input_0_ds, 0, nullptr);
+                          0, 1, &m_input_ds, 0, nullptr);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_layout,
-                          1, 1, &m_output_0_ds, 0, nullptr);
+                          1, 1, &m_output_ds, 0, nullptr);
   vkCmdPushConstants(cmd, m_compute_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                      sizeof(ComputePushConstants), &m_compute_pipeline.data);
   vkCmdDispatch(cmd, 4, 1, 1);
@@ -402,5 +445,24 @@ void Engine::getResult(VkCommandBuffer cmd) {
   copy.srcOffset = 0;
   copy.dstOffset = 0;
   copy.size = 1024 * sizeof(float);
-  vkCmdCopyBuffer(cmd, m_output_0.buffer, m_readback_0.buffer, 1, &copy);
+  vkCmdCopyBuffer(cmd, m_output_buffers[0].buffer, m_readback_buffers[0].buffer,
+                  1, &copy);
+}
+void Engine::immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func) {
+  VK_CHECK(vkResetFences(m_device, 1, &m_imm_fence));
+  VK_CHECK(vkResetCommandBuffer(m_imm_cmd, 0));
+
+  VkCommandBuffer cmd = m_imm_cmd;
+  VkCommandBufferBeginInfo cmdBeginInfo =
+      vkinit::cmdBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+  VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+  func(cmd);
+
+  VK_CHECK(vkEndCommandBuffer(cmd));
+  VkCommandBufferSubmitInfo cmd_info = vkinit::cmdBufferSubmitInfo(cmd);
+  VkSubmitInfo2 submit = vkinit::submitInfo(&cmd_info, nullptr, nullptr);
+
+  VK_CHECK(vkQueueSubmit2(m_compute_queue, 1, &submit, m_imm_fence));
+  VK_CHECK(vkWaitForFences(m_device, 1, &m_imm_fence, true, VK_ONE_SEC));
 }

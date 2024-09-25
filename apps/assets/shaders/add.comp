@@ -1,11 +1,14 @@
 #version 450
 layout(local_size_x = 256)in;
 
-layout(set = 0, binding = 0)buffer InputBuffer {
+layout(set = 0, binding = 0)buffer InputBuffer0 {
   float data[];
 } input_0;
+layout(set = 0, binding = 1)buffer InputBuffer1 {
+  float data[];
+} input_1;
 
-layout(set = 1, binding = 0)buffer OutputBuffer {
+layout(set = 1, binding = 0)buffer OutputBuffer0 {
   float data[];
 } output_0;
 
@@ -18,7 +21,9 @@ layout(push_constant)uniform PushConstants {
 
 void main() {
   uint gID = gl_GlobalInvocationID.x;
-  float val = input_0.data[gID];
-  val += 3.14f;
+  float val_0 = input_0.data[gID];
+  float val_1 = input_1.data[gID];
+
+  float val = val_0 + val_1;
   output_0.data[gID] = val;
 }

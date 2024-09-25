@@ -67,18 +67,19 @@ struct EngineStats {
   Timer t_cpu_draw;
 };
 
+constexpr size_t kNInputBuffers = 2;
+constexpr size_t kNOutputBuffers = 1;
+
 class Engine : public ObjectBase {
 public:
   // Engine() = delete;
   void init();
   void run();
-  void draw();
+  void process();
   void cleanup();
 
-  bool stop_rendering{false};
   bool is_initialized{false};
   int task_number{0};
-  VkExtent2D window_extent{1920, 1080};
   EngineStats stats;
 
   static Engine &get();
@@ -98,16 +99,14 @@ private:
   VmaAllocator m_allocator;
 
   // Input.
-  AllocatedBuffer m_input_0;
-  VkDescriptorSet m_input_0_ds;
-  VkDescriptorSetLayout m_input_0_ds_layout;
+  std::vector<AllocatedBuffer> m_input_buffers;
+  VkDescriptorSet m_input_ds;
+  VkDescriptorSetLayout m_input_ds_layout;
   // Output.
-  AllocatedBuffer m_output_0;
-  VkDescriptorSet m_output_0_ds;
-  VkDescriptorSetLayout m_output_0_ds_layout;
-  AllocatedBuffer m_readback_0;
-  VkDescriptorSet m_readback_0_ds;
-  VkDescriptorSetLayout m_readback_0_ds_layout;
+  std::vector<AllocatedBuffer> m_output_buffers;
+  VkDescriptorSet m_output_ds;
+  VkDescriptorSetLayout m_output_ds_layout;
+  std::vector<AllocatedBuffer> m_readback_buffers;
 
   DescriptorAllocator m_global_ds_allocator;
 
@@ -117,6 +116,9 @@ private:
   VkFence m_compute_fence;
   VkCommandBuffer m_compute_cmd;
   VkCommandPool m_compute_cmd_pool;
+  VkFence m_imm_fence;
+  VkCommandBuffer m_imm_cmd;
+  VkCommandPool m_imm_cmd_pool;
 
   VkQueryPool m_query_pool_timestamp;
   std::vector<uint64_t> m_timestamps;
@@ -136,7 +138,7 @@ private:
 
   ComputeTask &getCurrentTask() { return m_tasks[task_number]; }
 
-  void updateInput(VkCommandBuffer cmd);
+  void updateInput();
   void doCompute(VkCommandBuffer cmd);
   void getResult(VkCommandBuffer cmd);
 
@@ -144,4 +146,6 @@ private:
       size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage,
       VmaAllocationCreateFlagBits mem_alloc = VMA_ALLOCATION_CREATE_MAPPED_BIT);
   void destroyBuffer(const AllocatedBuffer &buffer);
+
+  void immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func);
 };
