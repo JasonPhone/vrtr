@@ -12,7 +12,6 @@ if(WIN32)
   message(STATUS "Running on Windows.")
   set(HEADER_DIR "${CMAKE_SOURCE_DIR}/include")
   set(SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
-
   set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
   find_package(Vulkan REQUIRED)
 
@@ -24,6 +23,9 @@ if(WIN32)
     ${SOURCE_DIR}/vk_descriptors.cpp
     ${SOURCE_DIR}/vk_pipelines.cpp
   )
+  target_link_libraries(engine PRIVATE
+    tinyexr
+  )
   target_include_directories(engine PRIVATE
     ${Vulkan_INCLUDE_DIRS}
 
@@ -32,13 +34,13 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
     ${CMAKE_SOURCE_DIR}/extern/fmt/include
+    ${CMAKE_SOURCE_DIR}/extern/tinyexr
 
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
   )
 
   add_executable(${PROJECT_NAME} main.cpp)
-
   target_include_directories(${PROJECT_NAME} PRIVATE
     ${Vulkan_INCLUDE_DIRS}
 
@@ -51,7 +53,6 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
   )
-
   target_link_libraries(${PROJECT_NAME} PRIVATE
 
     # External binaries.

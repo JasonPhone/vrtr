@@ -44,6 +44,7 @@ struct ComputeTask {
    */
   std::string input_0;
   std::string input_1;
+  std::string input_2;
   std::string output_0;
 };
 
@@ -67,8 +68,11 @@ struct EngineStats {
   Timer t_cpu_draw;
 };
 
-constexpr size_t kNInputBuffers = 2;
+constexpr size_t kNInputBuffers = 3;
 constexpr size_t kNOutputBuffers = 1;
+
+constexpr float kWidth = 1280, kHeight = 720;
+constexpr size_t kBufferSize = 1280 * 720 * 4 * sizeof(float);
 
 class Engine : public ObjectBase {
 public:

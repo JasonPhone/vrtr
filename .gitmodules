@@ -13,3 +13,6 @@
 [submodule "extern/fmt"]
 	path = extern/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "extern/tinyexr"]
+	path = extern/tinyexr
+	url = https://github.com/syoyo/tinyexr.git

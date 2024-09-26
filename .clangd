@@ -6,14 +6,11 @@ InlayHints:
 CompileFlags:
   Add: [
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/GLM",
-        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/SDL/include",
-        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/ImGUI",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/stb",
-        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/tinyobjloader",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/vk-bootstrap",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/VMA/include",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/fmt/include",
-        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/fastgltf/include",
+        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/tinyexr",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/include",
         -I, "C:/VulkanSDK/1.3.290.0/Include",
     ]

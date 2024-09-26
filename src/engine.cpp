@@ -6,6 +6,7 @@
 #include "vk_images.h"
 #include "vk_pipelines.h"
 #include <VkBootstrap.h>
+#include <tinyexr.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
@@ -33,9 +34,10 @@ void Engine::init() {
   is_initialized = true;
   m_tasks.clear();
   m_tasks.push_back({
-      .input_0 = "./input_0.png",
-      .input_1 = "./input_1.png",
-      .output_0 = "./output_0.png",
+      .input_0 = "./mv0.exr",
+      .input_1 = "./mv1.exr",
+      .input_2 = "./depth1.exr",
+      .output_0 = "./mv1.5.exr",
   });
 }
 
@@ -100,10 +102,15 @@ void Engine::process() {
   // Read from CPU.
   vkDeviceWaitIdle(m_device);
   for (auto &buffer : m_readback_buffers) {
+    const char *err = nullptr;
     auto data = (const float *)buffer.alloc_info.pMappedData;
-    for (size_t i = 0; i < 10; i++)
-      fmt::print("{} ", data[i]);
-    fmt::print("\n");
+    int ret = SaveEXR(data, kWidth, kHeight, 4, 0,
+                      getCurrentTask().output_0.c_str(), &err);
+    if (ret != TINYEXR_SUCCESS) {
+      fmt::println("Failed saving exr {}", err);
+    } else {
+      fmt::println("Exr saved");
+    }
   }
 }
 void Engine::run() {
@@ -218,7 +225,7 @@ void Engine::initBuffers() {
   m_output_buffers.clear();
   m_readback_buffers.clear();
   for (size_t i = 0; i < kNInputBuffers; i++) {
-    auto buffer = createBuffer(1024 * sizeof(float),
+    auto buffer = createBuffer(kBufferSize,
                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
@@ -226,18 +233,17 @@ void Engine::initBuffers() {
     m_input_buffers.push_back(buffer);
   }
   for (size_t i = 0; i < kNOutputBuffers; i++) {
-    auto buffer = createBuffer(1024 * sizeof(float),
+    auto buffer = createBuffer(kBufferSize,
                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
     m_output_buffers.push_back(buffer);
-    buffer =
-        createBuffer(1024 * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                     VMA_MEMORY_USAGE_AUTO,
-                     VmaAllocationCreateFlagBits(
-                         VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
-                         VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    buffer = createBuffer(kBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                          VMA_MEMORY_USAGE_AUTO,
+                          VmaAllocationCreateFlagBits(
+                              VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+                              VMA_ALLOCATION_CREATE_MAPPED_BIT));
     m_readback_buffers.push_back(buffer);
   }
   fmt::println("#input buffers {}", m_input_buffers.size());
@@ -300,7 +306,7 @@ void Engine::initDescriptors() {
     DescriptorWriter writer;
     for (size_t i = 0; i < m_input_buffers.size(); i++) {
       builder.addBinding(i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.writeBuffer(i, m_input_buffers[i].buffer, 1024 * sizeof(float), 0,
+      writer.writeBuffer(i, m_input_buffers[i].buffer, kBufferSize, 0,
                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     }
     m_input_ds_layout = builder.build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -312,7 +318,7 @@ void Engine::initDescriptors() {
     DescriptorWriter writer;
     for (size_t i = 0; i < m_output_buffers.size(); i++) {
       builder.addBinding(i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.writeBuffer(i, m_output_buffers[i].buffer, 1024 * sizeof(float), 0,
+      writer.writeBuffer(i, m_output_buffers[i].buffer, kBufferSize, 0,
                          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     }
     m_output_ds_layout = builder.build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
@@ -365,6 +371,9 @@ void Engine::initComputePipelines() {
   m_compute_pipeline.layout = m_compute_layout;
   m_compute_pipeline.name = "add";
   m_compute_pipeline.data = {};
+  m_compute_pipeline.data.data1.x = kWidth;
+  m_compute_pipeline.data.data1.y = kHeight;
+  m_compute_pipeline.data.data1.z = 4;
   ci_comp_pipeline.stage.module = add_shader;
   VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1,
                                     &ci_comp_pipeline, nullptr,
@@ -402,31 +411,42 @@ void Engine::destroyBuffer(const AllocatedBuffer &buffer) {
 void Engine::initDefaultData() {}
 
 void Engine::updateInput() {
+  auto task = getCurrentTask();
+  float *out; // width * height * RGBA
+  int width, height;
+  int ret;
+  const char *err = nullptr;
+
   VkBufferCopy copy;
   copy.srcOffset = 0;
   copy.dstOffset = 0;
-  copy.size = 1024 * sizeof(float);
-  AllocatedBuffer staging =
-      createBuffer(1024 * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                   VMA_MEMORY_USAGE_AUTO,
-                   VmaAllocationCreateFlagBits(
-                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-                       VMA_ALLOCATION_CREATE_MAPPED_BIT));
-  float *data = new float[1024];
+  copy.size = kBufferSize;
+  AllocatedBuffer staging = createBuffer(
+      kBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO,
+      VmaAllocationCreateFlagBits(
+          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+          VMA_ALLOCATION_CREATE_MAPPED_BIT));
 
-  std::fill(data, data + 1024, 3.14f);
-  memcpy(staging.alloc_info.pMappedData, data, 1024 * sizeof(float));
+  ret = LoadEXR(&out, &width, &height, task.input_0.c_str(), &err);
+  memcpy(staging.alloc_info.pMappedData, out, kBufferSize);
   immediateSubmit([&](VkCommandBuffer _cmd) {
     vkCmdCopyBuffer(_cmd, staging.buffer, m_input_buffers[0].buffer, 1, &copy);
   });
 
-  std::fill(data, data + 1024, 2.72f);
-  memcpy(staging.alloc_info.pMappedData, data, 1024 * sizeof(float));
+  ret = LoadEXR(&out, &width, &height, task.input_1.c_str(), &err);
+  memcpy(staging.alloc_info.pMappedData, out, kBufferSize);
   immediateSubmit([&](VkCommandBuffer _cmd) {
     vkCmdCopyBuffer(_cmd, staging.buffer, m_input_buffers[1].buffer, 1, &copy);
   });
 
-  delete[] data;
+  ret = LoadEXR(&out, &width, &height, task.input_2.c_str(), &err);
+  memcpy(staging.alloc_info.pMappedData, out, kBufferSize);
+  immediateSubmit([&](VkCommandBuffer _cmd) {
+    vkCmdCopyBuffer(_cmd, staging.buffer, m_input_buffers[2].buffer, 1, &copy);
+  });
+
+  FreeEXRErrorMessage(err);
+  free(out);
   destroyBuffer(staging);
 }
 void Engine::doCompute(VkCommandBuffer cmd) {
@@ -438,13 +458,13 @@ void Engine::doCompute(VkCommandBuffer cmd) {
                           1, 1, &m_output_ds, 0, nullptr);
   vkCmdPushConstants(cmd, m_compute_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                      sizeof(ComputePushConstants), &m_compute_pipeline.data);
-  vkCmdDispatch(cmd, 4, 1, 1);
+  vkCmdDispatch(cmd, kWidth / 16, kHeight / 16, 1);
 }
 void Engine::getResult(VkCommandBuffer cmd) {
   VkBufferCopy copy;
   copy.srcOffset = 0;
   copy.dstOffset = 0;
-  copy.size = 1024 * sizeof(float);
+  copy.size = kBufferSize;
   vkCmdCopyBuffer(cmd, m_output_buffers[0].buffer, m_readback_buffers[0].buffer,
                   1, &copy);
 }
