@@ -165,6 +165,8 @@ void Engine::initVulkan() {
           .set_required_features_12(features12)
           .require_present(false)
           .add_required_extension(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME)
+          .add_required_extension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME)
+          .add_required_extension(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME)
           .select_devices();
   // Naive select by physical device property.
   if (phy_device_list.has_value()) {
@@ -186,7 +188,19 @@ void Engine::initVulkan() {
   }
 
   // Final vulkan device.
+  VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT ext_feat = {
+      .sType =
+          VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT,
+      .pNext = nullptr,
+  };
+  VkPhysicalDeviceFeatures2 feat2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+  };
+  feat2.pNext = &ext_feat;
+  vkGetPhysicalDeviceFeatures2(physical_device.physical_device, &feat2);
+
   vkb::DeviceBuilder device_builder{physical_device};
+  device_builder.add_pNext(&ext_feat);
   vkb::Device vkb_device = device_builder.build().value();
   // Get the VkDevice handle for the rest of a vulkan application.
   m_device = vkb_device.device;
@@ -458,6 +472,7 @@ void Engine::doCompute(VkCommandBuffer cmd) {
                           1, 1, &m_output_ds, 0, nullptr);
   vkCmdPushConstants(cmd, m_compute_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                      sizeof(ComputePushConstants), &m_compute_pipeline.data);
+
   vkCmdDispatch(cmd, kWidth / 16, kHeight / 16, 1);
 }
 void Engine::getResult(VkCommandBuffer cmd) {

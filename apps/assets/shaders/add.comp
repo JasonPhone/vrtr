@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_shader_atomic_float2 : require
 layout(local_size_x = 16, local_size_y = 16)in;
 
 layout(set = 0, binding = 0)buffer InputBuffer0 {
@@ -70,11 +71,31 @@ void writeBuffer(int wi, int hi, vec4 val) {
 }
 
 void main() {
-  ivec2 pos_1 = ivec2(kGlobalId.xy);
-  vec4 mv1 = readBuffer1(pos_1.x, pos_1.y);
-  float depth1 = readBuffer2(pos_1.x, pos_1.y).x;
-  ivec2 pos_0 = pos_1 + ivec2(mv1.x, mv1.y);
-  vec4 mv0 = readBuffer0(pos_0.x, pos_0.y);
+  ivec2 cover_min = kGroupId.xy * kGroupSize.xy;
+  ivec2 cover_max = cover_min + kGroupSize.xy - ivec2(1, 1);
 
-  writeBuffer(kGlobalId.x, kGlobalId.y, mv0 + mv1);
+  ivec2 pos_1 = ivec2(kGlobalId.xy);
+  vec2 mv_1 = readBuffer1(pos_1.x, pos_1.y).xy;
+  float depth_1 = readBuffer2(pos_1.x, pos_1.y).x;
+  ivec2 pos_0 = pos_1 + ivec2(mv_1.x, mv_1.y);
+  vec2 mv_0 = readBuffer0(pos_0.x, pos_0.y).xy;
+  vec2 mv_15 = 0.5 * (0.5 * (3 * mv_1 - mv_0) + 0.5 * 0.5 * (mv_1 - mv_0));
+  vec2 pos_15 = pos_1 + mv_15;
+  int idx = indexBuffer(int(pos_15.x + 0.5), int(pos_15.y + 0.5));
+
+  atomicMax(output_0.data[idx + 0], 1 - depth_1);
+  atomicMax(output_0.data[idx + 1], 1 - depth_1);
+  atomicMax(output_0.data[idx + 2], 1 - depth_1);
+
+  barrier();
+  memoryBarrierShared();
+
+  // writeBuffer(cover_min.x, cover_min.y, vec4(kGroupId.xy, 1, 1));
+  // writeBuffer(cover_max.x, cover_max.y, vec4(kGroupId.xy, 1, 1));
+  // if (kLocalId.x == 0 && kLocalId.y == 0)
+  // color = vec4(kGlobalId.xy, kGroupId.xy);
+  // if (kLocalId.x == 15 && kLocalId.y == 15)
+  // color = vec4(kGlobalId.xy, kGroupId.xy);
+
+  // writeBuffer(kGlobalId.x, kGlobalId.y, color);
 }
