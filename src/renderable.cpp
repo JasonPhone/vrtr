@@ -31,7 +31,7 @@ void MeshNode::draw(const glm::mat4 &top_matrix, DrawContext &context) {
     case MaterialPass::Others:
       break;
     case MaterialPass::BasicTransparent:
-      context.transparent_surfaces.push_back(surface);
+      // context.transparent_surfaces.push_back(surface);
       break;
     }
   }

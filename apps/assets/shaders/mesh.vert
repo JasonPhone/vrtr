@@ -10,6 +10,10 @@ layout(location = 1)out vec3 outColor;
 layout(location = 2)out vec2 outUV;
 layout(location = 3)out vec2 out_mv;
 
+layout(location = 4)out float out_depth;
+layout(location = 5)out mat4 out_pre_vp;
+layout(location = 9)out mat4 out_cur_vp;
+
 struct Vertex {
 
   vec3 position;
@@ -45,4 +49,8 @@ void main()
 
   vec4 prev_position = sceneData.prev_view_proj * PushConstants.render_matrix * position;
   out_mv = prev_position.xy / prev_position.w - gl_Position.xy / gl_Position.w;
+
+  out_depth = gl_Position.z / gl_Position.w;
+  out_cur_vp = sceneData.viewproj;
+  out_pre_vp = sceneData.prev_view_proj;
 }
