@@ -114,8 +114,8 @@ private:
 
   DescriptorAllocator m_global_ds_allocator;
 
-  VkPipelineLayout m_compute_layout;
-  ComputePipeline m_compute_pipeline;
+  // ComputePipeline m_compute_pipeline;
+  std::vector<ComputePipeline> m_compute_pipelines;
 
   VkFence m_compute_fence;
   VkCommandBuffer m_compute_cmd;
@@ -144,6 +144,8 @@ private:
 
   void updateInput();
   void doCompute(VkCommandBuffer cmd);
+  void depthPass(VkCommandBuffer cmd);
+  void splatPass(VkCommandBuffer cmd);
   void getResult(VkCommandBuffer cmd);
 
   AllocatedBuffer createBuffer(

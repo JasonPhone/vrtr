@@ -249,6 +249,7 @@ void Engine::initBuffers() {
   for (size_t i = 0; i < kNOutputBuffers; i++) {
     auto buffer = createBuffer(kBufferSize,
                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                   VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                                VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
@@ -351,6 +352,7 @@ void Engine::initPipelines() {
   initComputePipelines();
 }
 void Engine::initComputePipelines() {
+  VkPipelineLayout pipeline_layout = {};
   VkDescriptorSetLayout layouts[2] = {m_input_ds_layout, m_output_ds_layout};
   VkPushConstantRange push_range = {};
   push_range.offset = 0;
@@ -365,7 +367,7 @@ void Engine::initComputePipelines() {
   ci_comp_layout.pPushConstantRanges = &push_range;
   ci_comp_layout.pushConstantRangeCount = 1;
   VK_CHECK(vkCreatePipelineLayout(m_device, &ci_comp_layout, nullptr,
-                                  &m_compute_layout));
+                                  &pipeline_layout));
   VkPipelineShaderStageCreateInfo ci_stage = {};
   ci_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   ci_stage.pNext = nullptr;
@@ -374,29 +376,54 @@ void Engine::initComputePipelines() {
   VkComputePipelineCreateInfo ci_comp_pipeline = {};
   ci_comp_pipeline.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
   ci_comp_pipeline.pNext = nullptr;
-  ci_comp_pipeline.layout = m_compute_layout;
+  ci_comp_pipeline.layout = pipeline_layout;
   ci_comp_pipeline.stage = ci_stage; // Copy by values.
 
-  VkShaderModule add_shader;
-  if (!vkutil::loadShaderModule("../../assets/shaders/add.comp.spv", m_device,
-                                &add_shader)) {
+  VkShaderModule depth_shader;
+  if (!vkutil::loadShaderModule("../../assets/shaders/1.depthTest.comp.spv",
+                                m_device, &depth_shader)) {
     fmt::println("Error building compute shader.");
   }
-  m_compute_pipeline.layout = m_compute_layout;
-  m_compute_pipeline.name = "add";
-  m_compute_pipeline.data = {};
-  m_compute_pipeline.data.data1.x = kWidth;
-  m_compute_pipeline.data.data1.y = kHeight;
-  m_compute_pipeline.data.data1.z = 4;
-  ci_comp_pipeline.stage.module = add_shader;
+  ComputePipeline pipeline;
+  pipeline.layout = pipeline_layout;
+  pipeline.name = "depth";
+  pipeline.data = {};
+  pipeline.data.data1.x = kWidth;
+  pipeline.data.data1.y = kHeight;
+  pipeline.data.data1.z = 4;
+  ci_comp_pipeline.stage.module = depth_shader;
   VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1,
                                     &ci_comp_pipeline, nullptr,
-                                    &m_compute_pipeline.pipeline));
-  vkDestroyShaderModule(m_device, add_shader, nullptr);
+                                    &pipeline.pipeline));
+  m_compute_pipelines.push_back(pipeline);
+  vkDestroyShaderModule(m_device, depth_shader, nullptr);
+
+  VkShaderModule splat_shader;
+  if (!vkutil::loadShaderModule("../../assets/shaders/2.mvSplat.comp.spv",
+                                m_device, &splat_shader)) {
+    fmt::println("Error building compute shader.");
+  }
+  pipeline.layout = pipeline_layout;
+  pipeline.name = "splat";
+  pipeline.data = {};
+  pipeline.data.data1.x = kWidth;
+  pipeline.data.data1.y = kHeight;
+  pipeline.data.data1.z = 4;
+  ci_comp_pipeline.stage.module = splat_shader;
+  VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1,
+                                    &ci_comp_pipeline, nullptr,
+                                    &pipeline.pipeline));
+  m_compute_pipelines.push_back(pipeline);
+  vkDestroyShaderModule(m_device, splat_shader, nullptr);
 
   m_main_deletion_queue.push([&]() {
-    vkDestroyPipelineLayout(m_device, m_compute_layout, nullptr);
-    vkDestroyPipeline(m_device, m_compute_pipeline.pipeline, nullptr);
+    // vkDestroyPipelineLayout(m_device, m_compute_pipeline.layout, nullptr);
+    // vkDestroyPipeline(m_device, m_compute_pipeline.pipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, m_compute_pipelines[0].layout, nullptr);
+    for (auto &p : m_compute_pipelines) {
+      // vkDestroyPipelineLayout(m_device, p.layout, nullptr);
+      vkDestroyPipeline(m_device, p.pipeline, nullptr);
+    }
   });
 }
 
@@ -459,21 +486,47 @@ void Engine::updateInput() {
     vkCmdCopyBuffer(_cmd, staging.buffer, m_input_buffers[2].buffer, 1, &copy);
   });
 
+  // immediateSubmit([&](VkCommandBuffer _cmd) {
+  //   vkCmdFillBuffer(_cmd, m_output_buffers[0].buffer, 0, VK_WHOLE_SIZE,
+  //                   uint32_t(0x3f800000));
+  // });
+
   FreeEXRErrorMessage(err);
   free(out);
   destroyBuffer(staging);
 }
 void Engine::doCompute(VkCommandBuffer cmd) {
+  depthPass(cmd);
+  splatPass(cmd);
+}
+void Engine::depthPass(VkCommandBuffer cmd) {
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                    m_compute_pipeline.pipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_layout,
-                          0, 1, &m_input_ds, 0, nullptr);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_layout,
-                          1, 1, &m_output_ds, 0, nullptr);
-  vkCmdPushConstants(cmd, m_compute_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                     sizeof(ComputePushConstants), &m_compute_pipeline.data);
-
-  vkCmdDispatch(cmd, kWidth / 16, kHeight / 16, 1);
+                    m_compute_pipelines[0].pipeline);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          m_compute_pipelines[0].layout, 0, 1, &m_input_ds, 0,
+                          nullptr);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          m_compute_pipelines[0].layout, 1, 1, &m_output_ds, 0,
+                          nullptr);
+  vkCmdPushConstants(
+      cmd, m_compute_pipelines[0].layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+      sizeof(ComputePushConstants), &m_compute_pipelines[0].data);
+  vkCmdDispatch(cmd, kWidth / 4, kHeight / 4, 1);
+  // vkCmdDispatch(cmd, kWidth / 16, kHeight / 16, 1);
+}
+void Engine::splatPass(VkCommandBuffer cmd) {
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                    m_compute_pipelines[1].pipeline);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          m_compute_pipelines[1].layout, 0, 1, &m_input_ds, 0,
+                          nullptr);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          m_compute_pipelines[1].layout, 1, 1, &m_output_ds, 0,
+                          nullptr);
+  vkCmdPushConstants(
+      cmd, m_compute_pipelines[1].layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+      sizeof(ComputePushConstants), &m_compute_pipelines[1].data);
+  vkCmdDispatch(cmd, kWidth / 4, kHeight / 4, 1);
 }
 void Engine::getResult(VkCommandBuffer cmd) {
   VkBufferCopy copy;
