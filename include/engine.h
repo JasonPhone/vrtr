@@ -204,10 +204,8 @@ private:
   VkPipeline m_simple_mesh_pipeline;
   GPUMeshBuffers m_simple_mesh;
 
-  std::vector<std::shared_ptr<MeshAsset>> m_meshes;
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> m_loaded_scenes;
   DrawContext m_main_draw_context;
-  std::unordered_map<std::string, std::shared_ptr<Node>> m_loaded_nodes;
   void updateScene();
   Camera m_main_camera;
 

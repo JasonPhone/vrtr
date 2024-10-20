@@ -22,11 +22,11 @@ void main()
   vec3 ambient = color * sceneData.ambientColor.xyz;
 
   outFragColor = vec4(color * lightValue * sceneData.sunlightColor.w + ambient , 1.0f);
-  outFragColor = vec4(sqrt(in_mv.x), sqrt(in_mv.y), 0.0f, 1.0f);
 
-  vec2 ss_coord = gl_FragCoord.xy / vec2(1920, 1080) * 2 - 1;
-  vec4 ss_cur_pos = vec4(ss_coord, in_depth, 1);
-  // vec4 ss_cur_pos = vec4(ss_coord, in_depth * 2 - 1, 1);
-  vec4 ss_pre_pos = in_pre_vp * inverse(in_cur_vp) * ss_cur_pos;
-  outFragColor = vec4(ss_pre_pos.xy, 0, 1.0);
+  // outFragColor = vec4(sqrt(in_mv.x), sqrt(in_mv.y), 0.0f, 1.0f);
+  // vec2 ss_coord = gl_FragCoord.xy / vec2(1920, 1080) * 2 - 1;
+  // vec4 ss_cur_pos = vec4(ss_coord, in_depth, 1);
+  // // vec4 ss_cur_pos = vec4(ss_coord, in_depth * 2 - 1, 1);
+  // vec4 ss_pre_pos = in_pre_vp * inverse(in_cur_vp) * ss_cur_pos;
+  // outFragColor = vec4(ss_pre_pos.xy, 0, 1.0);
 }

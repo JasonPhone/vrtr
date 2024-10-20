@@ -22,8 +22,6 @@
 
 constexpr bool bUseValidationLayers = true;
 
-static Engine *loaded_engine = nullptr;
-
 bool isVisible(const RenderObject &obj, const glm::mat4 &view_proj) {
   std::array<glm::vec3, 8> corners{
       glm::vec3{1, 1, 1},   glm::vec3{1, 1, -1},   glm::vec3{1, -1, 1},
@@ -55,11 +53,11 @@ bool isVisible(const RenderObject &obj, const glm::mat4 &view_proj) {
   }
 }
 
-Engine &Engine::get() { return *loaded_engine; }
+Engine &Engine::get() {
+  static Engine engine; /// Singleton.
+  return engine;
+}
 void Engine::init() {
-  // Only one engine initialization is allowed with the application.
-  assert(loaded_engine == nullptr);
-  loaded_engine = this;
   // We initialize SDL and create a window with it.
   SDL_Init(SDL_INIT_VIDEO);
   SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
@@ -106,7 +104,6 @@ void Engine::cleanup() {
     ImGui::DestroyContext();
     SDL_DestroyWindow(window);
   }
-  loaded_engine = nullptr;
 }
 
 void Engine::draw() {
@@ -413,12 +410,12 @@ void Engine::run() {
         ImGui::Text("\tGPU geometry    %f ms", t_geom);
         ImGui::Text("\tGPU others      %f ms", t_other);
 
-        auto& cam_pos = m_main_camera.position;
+        auto &cam_pos = m_main_camera.position;
         ImGui::Text("Camera:");
-        ImGui::Text("\tPosition (%.3f, %.3f, %.3f)", cam_pos.x, cam_pos.y, cam_pos.z);
+        ImGui::Text("\tPosition (%.3f, %.3f, %.3f)", cam_pos.x, cam_pos.y,
+                    cam_pos.z);
         ImGui::Text("\tPitch    %.3f", m_main_camera.pitch);
         ImGui::Text("\tYaw      %.3f", m_main_camera.yaw);
-
       }
       ImGui::End();
     }
@@ -993,39 +990,6 @@ GPUMeshBuffers Engine::uploadMesh(std::span<uint32_t> indices,
 }
 
 void Engine::initDefaultData() {
-  // std::array<Vertex, 4> rect_vertices;
-  // rect_vertices[0].position = {0.5, -0.5, 0};
-  // rect_vertices[1].position = {0.5, 0.5, 0};
-  // rect_vertices[2].position = {-0.5, -0.5, 0};
-  // rect_vertices[3].position = {-0.5, 0.5, 0};
-  // rect_vertices[0].color = {0.8, 0.2, 0.2, 1};
-  // rect_vertices[1].color = {0.2, 0.8, 0.2, 1};
-  // rect_vertices[2].color = {0.2, 0.2, 0.8, 1};
-  // rect_vertices[3].color = {0.8, 0.8, 0.8, 1};
-
-  // std::array<uint32_t, 6> rect_indices;
-  // rect_indices[0] = 0;
-  // rect_indices[1] = 1;
-  // rect_indices[2] = 2;
-  // rect_indices[3] = 2;
-  // rect_indices[4] = 1;
-  // rect_indices[5] = 3;
-
-  // m_simple_mesh = uploadMesh(rect_indices, rect_vertices);
-  // m_main_deletion_queue.push([&]() {
-  //   destroyBuffer(m_simple_mesh.index_buffer);
-  //   destroyBuffer(m_simple_mesh.vertex_buffer);
-  // });
-
-  // m_meshes = loadGltfMeshes(this,
-  // "../../assets/models/basic_mesh.glb").value(); for (auto &&mesh : m_meshes)
-  // {
-  //   m_main_deletion_queue.push([&]() {
-  //     destroyBuffer(mesh->mesh_buffers.vertex_buffer);
-  //     destroyBuffer(mesh->mesh_buffers.index_buffer);
-  //   });
-  // }
-
   uint32_t white = glm::packUnorm4x8(glm::vec4(1, 1, 1, 1));
   m_white_image =
       createImage((void *)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
@@ -1066,36 +1030,6 @@ void Engine::initDefaultData() {
     destroyImage(m_gray_image);
     destroyImage(m_error_image);
   });
-
-  // GLTFMetallicRoughness::MaterialResources mat_res;
-  // mat_res.color_image = m_white_image;
-  // mat_res.color_sampler = m_default_sampler_linear;
-  // mat_res.metal_rough_image = m_white_image;
-  // mat_res.metal_rough_sampler = m_default_sampler_linear;
-  // AllocatedBuffer mat_const = createBuffer(
-  //     sizeof(GLTFMetallicRoughness::MaterialConstants),
-  //     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  // GLTFMetallicRoughness::MaterialConstants *scene_uniform =
-  //     (GLTFMetallicRoughness::MaterialConstants *)
-  //         mat_const.allocation->GetMappedData();
-  // scene_uniform->color_factors = glm::vec4{1, 1, 1, 1};
-  // scene_uniform->metal_rough_factors = glm::vec4{1, 0.5, 0, 0};
-  // m_main_deletion_queue.push([=, this]() { destroyBuffer(mat_const); });
-  // mat_res.data_buffer = mat_const.buffer;
-  // mat_res.data_buffer_offset = 0;
-  // m_default_material = m_metal_rough_mat.writeMaterial(
-  //     m_device, MaterialPass::BasicMainColor, mat_res,
-  //     m_global_ds_allocator);
-
-  // for (auto &m : m_meshes) {
-  //   std::shared_ptr<MeshNode> node = std::make_shared<MeshNode>();
-  //   node->mesh = m;
-  //   node->transform_local = glm::mat4{1.f};
-  //   node->transform_world = glm::mat4{1.f};
-  //   for (auto &s : node->mesh->surfaces)
-  //     s.material = std::make_shared<GLTFMaterial>(m_default_mat);
-  //   m_loaded_nodes[m->name] = std::move(node);
-  // }
 
   std::string structurePath = {"../../assets/models/structure.glb"};
   auto structureFile = loadGltf(this, structurePath);
@@ -1188,12 +1122,6 @@ void Engine::updateScene() {
   m_main_draw_context.opaque_surfaces.clear();
   m_main_draw_context.transparent_surfaces.clear();
 
-  // m_loaded_nodes["Suzanne"]->draw(glm::mat4{1.f}, m_main_draw_context);
-  // for (int x = -3; x < 3; x++) {
-  //   glm::mat4 scale = glm::scale(glm::vec3{0.2});
-  //   glm::mat4 translation = glm::translate(glm::vec3{x + 0.5, 1, 0});
-  //   m_loaded_nodes["Cube"]->draw(translation * scale, m_main_draw_context);
-  // }
   m_loaded_scenes["structure"]->draw(glm::mat4{1.f}, m_main_draw_context);
 
   m_scene_data.view = m_main_camera.getViewMatrix();
@@ -1206,6 +1134,7 @@ void Engine::updateScene() {
   m_scene_data.sunlight_color = glm::vec4(1.f);
   m_scene_data.sunlight_dir = glm::vec4(0, 1, 0.5, 1.f);
 }
+
 void GLTFMetallicRoughness::buildPipelines(Engine *engine) {
   VkShaderModule mesh_frag_shader;
   if (!vkutil::loadShaderModule("../../assets/shaders/mesh.frag.spv",

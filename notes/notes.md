@@ -12,7 +12,7 @@ Render pass and dynamic rendering.
 
 ## Function
 
-- [ ] detailed compute pipeline for data processing
+- [x] detailed compute pipeline for data processing. See branch `var.compute`
 - [ ] deferred rendering.
 - [ ] GPU-driven, pbr ibl, cascaded shadow mapping.
 - [ ] Reversed-z: projection mat, depth compare operator, depth attachment clear value.
@@ -39,6 +39,83 @@ Can mitigate z-fighting because
 2) IEEE754 float value has higher precision when its abs is small.
 
 By now (1419b16) the descriptor set is used to bind output image of compute shader.
+
+
+# System Procedure
+
+## Engine::init()
+
+Items to init:
+- SDL
+- Vulkan API
+- swapchain
+- command pools and buffers
+- sync structures
+- descriptors for shader IO
+- pipelines
+- ImGUI
+- scene (mesh and data)
+- camera
+
+## Engine::run()
+
+```cpp
+while (not quitting) {
+  poolEvents();
+  updateGUI();
+  draw();
+}
+```
+
+## Engine::cleanup()
+
+First wait device to idle.
+
+Items to clean:
+- loaded scenes
+- frame-dedicated data and deletion queue
+- material resources (pipelines)
+- main deletion queue
+- ImGUI and SDL
+
+## Engine::initDefaultData()
+
+- Images for default colors, currently stored in Engine class.
+- Default samplers for images, linear and nearest.
+- A scene from .glb file, need to be refactored.
+
+## Engine::draw()
+
+update scene
+wait and get target frame
+fill command buffer
+submit command buffer, present to swapchain
+
+## Engine::updateScene()
+
+update camera to get view matrix.
+
+clear draw context of last frame, and fill it with current scene
+
+upload scene data: view matrix, ambient color, light source.
+
+# Data Stream
+
+## Scene Data
+
+```cpp
+std::optional<std::shared_ptr<LoadedGLTF>>
+loadGltf(Engine *engine, std::filesystem::path file_path);
+```
+
+material is currently held by Engine::m_metal_rough_mat and responsible for creating material instances (pipeline, desc set, pass type).
+
+
+## Vulkan Data
+
+auxiliary data: global data, frame-dedicated data
+
+---
 
 # Overall structure
 
