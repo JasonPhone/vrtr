@@ -14,9 +14,10 @@ Render pass and dynamic rendering.
 
 - [x] detailed compute pipeline for data processing. See branch `var.compute`
 - [ ] deferred rendering.
-- [ ] GPU-driven, pbr ibl, cascaded shadow mapping.
 - [ ] Reversed-z: projection mat, depth compare operator, depth attachment clear value.
+- [ ] GPU-driven, pbr ibl, cascaded shadow mapping.
 - [ ] CVAR system for configurable renderer.
+- [ ] move to RenderPass.
 - [ ] Multithreading.
 
 ## Structure
@@ -111,6 +112,7 @@ loadGltf(Engine *engine, std::filesystem::path file_path);
 material is currently held by Engine::m_metal_rough_mat and responsible for creating material instances (pipeline, desc set, pass type).
 
 
+
 ## Vulkan Data
 
 auxiliary data: global data, frame-dedicated data
@@ -160,78 +162,3 @@ Vulkan: Data processing by shader on GPU.
 api instance, physical device and queue family, logical device and queue.
 swapchain, images, command pool and buffer, sync structures.
 descriptor layout, descriptorset and descriptor pool.
-
-## Engine::init()
-
-Init all structures and data.
-
-Engine is a thread-unsafe singleton, it's checked here.
-SDL window is created, with window flags herd-coded here.
-
-Engine::initVulkan():
-build the Vulkan API instance, debug messenger.
-Create the native window surface with Vulkan API. This is for platform abstraction.
-Select GPU by hard-coded features, extensions and properties. We do no per-GPU check.
-Create logical device, get graphics queue family and corresponding queue.
-Create engine-wise vma memory allocator.
-Create query pool for render profiling.
-Remember to update the destroy queue.
-
-Engine::initSwapchain():
-Create swapchain.
-Create images, we render contents to these images then copy them to swapchain.
-`m_color_image` for final color from graphics pipeline or compute shader;
-`m_depth_image` for scene depth.
-
-Engine::initCommands(): Two kinds of command pool and command buffer.
-Per-frame command pool and buffer are in each frame data structure, for drawing.
-Immediate command pool and buffer are engine members, used for one-time commands like data upload.
-
-Engine::initSyncStructures():
-Per-frame fence and semaphore, for rendering sync. Necessary for double-buffering.
-Immediate command fence, for uploading sync.
-
-Engine::initDescriptors():
-Descriptor is used to describe data io for shaders.
-Des layout describe types of data going to bind with pipeline.
-Des set is allocated from des pool by the description of des layout, holding the actual buffer or image.
-We have a custom descriptorset allocator with a naive pool management.
-Per-frame allocator is for texture and gpu scene data, in graphics pipeline.
-Global allocator is currently for custom `m_color_image`, in compute pipeline.
-
-Engine::initPipelines():
-Compute pipeline layout = descriptorset layout + push constants range.
-Compute pipeline has one shader stage only, its module is where to attach the shader module.
-Compute pipeline = shader stage + pipeline layout.
-Graphics pipeline layout needs the same.
-There are many other config for graphics pipeline creation. We have a builder for this.
-
-Engine::initImGui():
-Not sure about the whole creation since it's behind current ImGui version.
-Further exploration needed.
-
-Engine::initDefaultData():
-Example of data loading, binding and uploading to GPU.
-Image and sampler.
-Mesh, material and texture from GlTF.
-
-## Engine::run()
-
-Event handling, overall configure, UI updating and pipeline draw.
-
-Should this be a delta-time based tick?
-
-## Engine::draw()
-
-Called by Engine::run().
-
-## Engine::cleanup()
-
-## Extern lib
-
-SDL, ImGui
-
-## Vulkan
-
-
-## Custom data

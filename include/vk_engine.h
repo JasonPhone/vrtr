@@ -1,4 +1,5 @@
 #pragma once
+#include "vk_engine.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
 #include "vk_loader.h"
@@ -185,12 +186,10 @@ private:
   AllocatedImage m_error_image;
   VkSampler m_default_sampler_linear;
   VkSampler m_default_sampler_nearest;
-  VkDescriptorSetLayout m_single_image_ds_layout;
   // Output images.
   AllocatedImage m_color_image;
   AllocatedImage m_depth_image;
 
-  MaterialInstance m_default_material;
   GLTFMetallicRoughness m_metal_rough_mat;
 
   DescriptorAllocator m_global_ds_allocator;
@@ -200,13 +199,17 @@ private:
   VkPipelineLayout m_compute_pipeline_layout;
   std::vector<ComputePipeline> m_compute_pipelines;
   int m_cur_comp_pipeline_idx = 0;
-  VkPipelineLayout m_simple_mesh_pipeline_layout;
-  VkPipeline m_simple_mesh_pipeline;
-  GPUMeshBuffers m_simple_mesh;
 
+  VkPipelineLayout m_pipeline_layout;
+  VkPipeline m_pipeline;
+  VkRenderPass m_render_pass;
+  VkFramebuffer m_framebuffer;
+  void initFrameBuffers();
+  void recordCmdBuffer(VkCommandBuffer cmd);
+
+  void updateScene();
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> m_loaded_scenes;
   DrawContext m_main_draw_context;
-  void updateScene();
   Camera m_main_camera;
 
   VkFence m_imm_fence;
@@ -225,8 +228,9 @@ private:
 
   void initDescriptors();
   void initPipelines();
-  void initBackgroundPipelines();
-  void initSimpleMeshPipeline();
+  void initComputePipelines();
+  void initGraphicPipelines();
+  void initRenderPasses();
   void initDefaultData();
 
   void initImGui();

@@ -16,8 +16,8 @@ if(WIN32)
   set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
   find_package(Vulkan REQUIRED)
 
-  add_library(engine STATIC
-    ${SOURCE_DIR}/engine.cpp
+  add_library(vk_engine STATIC
+    ${SOURCE_DIR}/vk_engine.cpp
 
     ${SOURCE_DIR}/vk_initializers.cpp
     ${SOURCE_DIR}/vk_images.cpp
@@ -27,10 +27,10 @@ if(WIN32)
     ${SOURCE_DIR}/renderable.cpp
     ${SOURCE_DIR}/camera.cpp
   )
-  target_link_libraries(engine PRIVATE
+  target_link_libraries(vk_engine PRIVATE
     fastgltf
   )
-  target_include_directories(engine PRIVATE
+  target_include_directories(vk_engine PRIVATE
     ${Vulkan_INCLUDE_DIRS}
 
     ${CMAKE_SOURCE_DIR}/extern/GLM
@@ -60,6 +60,8 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
     ${CMAKE_SOURCE_DIR}/extern/fmt/include
+    ${CMAKE_SOURCE_DIR}/extern/json/include
+    ${CMAKE_SOURCE_DIR}/extern/spdlog/include
 
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
@@ -72,13 +74,16 @@ if(WIN32)
     SDL3::SDL3
     tinyobjloader
     imgui
+    json
+    spdlog
     vk-bootstrap::vk-bootstrap
     stb
-    # vma # Impl in ./src/engine.cpp
+
+    # vma # Impl in ./src/vk_engine.cpp
     fmt::fmt
 
     # Project binaries.
-    engine
+    vk_engine
   )
 
   add_dependencies(${PROJECT_NAME} Shaders)

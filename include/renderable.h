@@ -58,13 +58,13 @@ struct LoadedGLTF : public IRenderable {
   std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshes;
   std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
   std::unordered_map<std::string, AllocatedImage> images;
-  std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
+  // std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
   // Nodes having no parent, for iterating through the file in tree order.
   std::vector<std::shared_ptr<Node>> top_nodes;
 
   std::vector<VkSampler> samplers;
   DescriptorAllocator descriptor_pool;
-  AllocatedBuffer material_data_buffer;
+  AllocatedBuffer material_constants_buffer;
   Engine *creator;
 
   ~LoadedGLTF() { clearAll(); };

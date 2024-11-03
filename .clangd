@@ -14,6 +14,8 @@ CompileFlags:
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/VMA/include",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/fmt/include",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/fastgltf/include",
+        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/json/include",
+        -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/extern/spdlog/include",
         -I, "C:/Users/Admin/Documents/003Code/cxx/vrtr/include",
         -I, "C:/VulkanSDK/1.3.290.0/Include",
     ]

@@ -1,5 +1,5 @@
 #include "renderable.h"
-#include "engine.h"
+#include "vk_engine.h"
 
 void Node::updateTransform(const glm::mat4 &parent_matrix) {
   transform_world = parent_matrix * transform_local;
@@ -45,7 +45,7 @@ void LoadedGLTF::draw(const glm::mat4 &top_mat, DrawContext &context) {
 void LoadedGLTF::clearAll() {
   VkDevice dv = creator->m_device;
   descriptor_pool.destroyPools(dv);
-  creator->destroyBuffer(material_data_buffer);
+  creator->destroyBuffer(material_constants_buffer);
 
   for (auto &[k, v] : meshes) {
     creator->destroyBuffer(v->mesh_buffers.index_buffer);

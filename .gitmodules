@@ -25,3 +25,9 @@
 [submodule "extern/fastgltf"]
 	path = extern/fastgltf
 	url = https://github.com/spnda/fastgltf
+[submodule "extern/json"]
+	path = extern/json
+	url = https://github.com/nlohmann/json.git
+[submodule "extern/spdlog"]
+	path = extern/spdlog
+	url = https://github.com/gabime/spdlog.git

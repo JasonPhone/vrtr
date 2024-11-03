@@ -10,7 +10,7 @@ message(STATUS "BUILDING SHADER")
 
 foreach(GLSL ${GLSL_SOURCE_FILES})
   get_filename_component(FILE_NAME ${GLSL} NAME)
-  set(SPIRV "${PROJECT_SOURCE_DIR}/apps/assets/shaders/${FILE_NAME}.spv")
+  set(SPIRV "${PROJECT_SOURCE_DIR}/apps/assets/shaders/spv/${FILE_NAME}.spv")
   set(COMPILE_CMD ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV})
   message(STATUS ${GLSL})
   # message(STATUS "COMMAND ${COMPILE_CMD}")

@@ -1,16 +1,12 @@
-#include "engine.h"
-#include <iostream>
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+#include "Application.hpp"
+#include "utils/json_util.hpp"
 
 int main(int, char *[]) {
-  auto engine = Engine::get();
-  std::cout << "init" << std::endl;
-  engine.init();
-  fmt::print("run\n");
-  engine.run();
-  fmt::print("cleanup\n");
-  engine.cleanup();
-
+  Json config = nlohmann::json::parse(
+      R"({"name": "vrtr", "window": {"width": 1920, "height": 1080}, "engine": {}})");
+  vrtr::Application app;
+  app.init(config);
+  app.run();
+  app.deinit();
   return 0;
 }
