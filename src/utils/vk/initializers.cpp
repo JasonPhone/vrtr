@@ -1,4 +1,4 @@
-#include "vk_initializers.h"
+#include "utils/vk/initializers.hpp"
 
 VkCommandPoolCreateInfo
 vkinit::cmdPoolCreateInfo(uint32_t queue_family_idx,

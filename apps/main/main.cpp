@@ -1,5 +1,5 @@
 #include "Application.hpp"
-#include "utils/json_util.hpp"
+#include "utils/json.hpp"
 
 int main(int, char *[]) {
   Json config = nlohmann::json::parse(
