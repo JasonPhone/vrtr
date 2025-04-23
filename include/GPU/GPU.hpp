@@ -3,6 +3,8 @@
 #include "utils/vk/allocation.hpp"
 #include "utils/vk/FrameData.hpp"
 #include "Scene/Scene.hpp"
+#include "RDG/RenderGraph.hpp"
+
 #include <SDL3/SDL.h>
 #include <vulkan/vulkan.h>
 
@@ -19,12 +21,11 @@ public:
   /// Frame-dedicated update.
   void updateScene(const Scene &scene);
   AllocatedImage uploadImage(void *data, VkExtent3D size, VkFormat format,
-                                   VkImageUsageFlags usage, bool mipmap = false);
+                             VkImageUsageFlags usage, bool mipmap = false);
   void draw();
 
 private:
   SDL_Window *m_window;
-  VkExtent2D m_window_extent;
   void initVulkan();
   VkInstance m_instance;
   VkSurfaceKHR m_surface;
@@ -38,7 +39,6 @@ private:
   void initSwapchain();
   void createSwapchain(int w, int h);
   void destroySwapchain();
-  VkFormat m_swapchain_format;
   VkExtent2D m_swapchain_extent;
   VkSwapchainKHR m_swapchain;
   std::vector<VkImage> m_swapchain_images;
@@ -88,6 +88,9 @@ private:
   AllocatedImage m_texture;
   VkSampler m_default_sampler_linear;
   VkSampler m_default_sampler_nearest;
+
+  void initRenderGraph();
+  rdg::RenderGraph m_render_graph;
 
   DeletionQueue m_deletion_queue;
 };

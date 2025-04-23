@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="qBEqS0YtWePVXxq-nKg_" name="Page-1">
-        <mxGraphModel dx="2282" dy="2405" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="2125" dy="2316" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -468,7 +468,7 @@
                     <mxGeometry x="1980" y="-500" width="120" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="137" value="device" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" parent="1" vertex="1">
-                    <mxGeometry x="1300" y="-60" width="120" height="30" as="geometry"/>
+                    <mxGeometry x="1380" y="-11" width="120" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="138" value="chosen_GPU" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" parent="1" vertex="1">
                     <mxGeometry x="2190" y="-410" width="120" height="30" as="geometry"/>
@@ -550,6 +550,296 @@
                 </mxCell>
                 <mxCell id="168" value="scene_data" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" parent="1" vertex="1">
                     <mxGeometry x="2230" y="844" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="251" value="" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="254" target="377">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="4610" y="478" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="254" value="vrtr::GPU::uploadScene()&lt;br&gt;mem_allocator" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3640" y="119" width="210" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="255" value="" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="257" target="275">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="256" value="" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="257" target="379">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="3985" y="-445.1879432624114" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="257" value="vrtr::GPU::updateScene()&lt;br&gt;(direct assign SceneData)" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3010" y="-271.5" width="260" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="259" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="364">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="5000" y="453" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="261" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="362">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="263" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="354">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="264" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="370">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="265" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="373">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="266" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="359">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="267" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="371">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="268" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="379">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="269" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="369">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="270" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="375">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="274" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="275" target="377">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="275" value="vrtr::GPU::draw()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3290" y="-360.5" width="260" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="279" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="286" target="351">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="280" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fontFamily=Lucida Console;" edge="1" parent="1" source="286" target="374">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="282" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="286" target="353">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="283" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="286" target="354">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="284" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="286" target="355">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="286" value="vrtr::GPU::initVulkan()&lt;br&gt;device&lt;br&gt;mem_allocator" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3880" y="-592" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="288" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="296" target="353">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="290" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="296" target="374">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="292" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="296" target="359">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="296" value="vrtr::GPU::initSwapchain()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4090" y="-492" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="298" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="303" target="362">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="303" value="vrtr::GPU::&lt;br&gt;initOffScreenImages()&lt;br&gt;device&lt;br&gt;extent&lt;br&gt;mem_allocator" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4195" y="-394.75" width="220" height="79.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="305" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="310" target="355">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="307" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="310" target="364">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="308" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="310" target="365">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="310" value="vrtr::GPU::initCommands()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4530" y="-96" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="313" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="315" target="364">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="383" style="edgeStyle=none;html=1;" edge="1" parent="1" source="315" target="365">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="315" value="vrtr::GPU::&lt;br&gt;initSyncStructures()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4350" y="-240" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="317" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="321" target="368">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="318" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="321" target="369">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="320" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="321" target="364">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="321" value="vrtr::GPU::initDescriptors()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4430" y="50" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="324" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="325" target="370">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="325" value="vrtr::GPU::initRenderPass()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4340" y="184" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="328" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="333" target="369">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="330" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="333" target="371">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="332" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="333" target="370">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="333" value="vrtr::GPU::initPipelines()&lt;br&gt;device&lt;br&gt;extent(viewport, scissor)" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4180" y="330" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="335" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="343" target="362">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="337" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="343" target="370">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="340" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="343" target="373">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="342" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="343" target="364">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="343" value="vrtr::GPU::&lt;br&gt;initFrameBuffers()&lt;br&gt;device&lt;br&gt;extent&lt;br&gt;mem_allocator" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3870" y="214.5" width="220" height="91" as="geometry"/>
+                </mxCell>
+                <mxCell id="345" value="" style="edgeStyle=none;html=1;fontFamily=Lucida Console;" edge="1" parent="1" source="348" target="375">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="4645" y="375.8767123287671" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="348" value="vrtr::GPU::initTextures()&lt;br&gt;device" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3520" y="-70" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="351" value="window&lt;br&gt;instance&lt;br&gt;debug_messenger" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3880" y="-713" width="120" height="53" as="geometry"/>
+                </mxCell>
+                <mxCell id="353" value="chosen_GPU" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="4075" y="-720" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="354" value="graphic_queue" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3450" y="-630" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="355" value="graphic_queue_family" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="4595" y="-590" width="160" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="359" value="swapchain&lt;br&gt;swapchain_images&lt;br&gt;swapchain_extent" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3570" y="-547" width="140" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="362" value="color_image&lt;br&gt;depth_image" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3920" y="-321.5" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="364" value="frames:&lt;br&gt;cmd buffers + per-frame databuffer" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="4050" y="-160" width="330" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="365" value="imm_cmd_pool&lt;br&gt;imm_cmd&lt;br&gt;imm_fence" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="4520" y="-331.5" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="368" value="descriptor_allocator" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="4700" y="50" width="155" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="369" value="desc_set_layouts" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="4040" y="-56" width="155" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="370" value="render_pass" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3840" y="20" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="371" value="pipeline_layout&lt;br&gt;pipeline" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3250" y="300" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="373" value="frame_buffer" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="3370" y="180" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="374" value="surface" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="4210" y="-660" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="375" value="texture&lt;br&gt;sampler" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+                    <mxGeometry x="3470" y="-180" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="377" value="vertex_buffer&lt;br&gt;index_buffer" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+                    <mxGeometry x="3450" y="27" width="120" height="47" as="geometry"/>
+                </mxCell>
+                <mxCell id="379" value="scene_data" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="2995" y="-360.5" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="406" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="404" target="405">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="408" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="404" target="407">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="404" value="RenderPipeline" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3120" y="570" width="220" height="66" as="geometry"/>
+                </mxCell>
+                <mxCell id="405" value="GPU&lt;br&gt;command buffer" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="2940" y="690" width="220" height="66" as="geometry"/>
+                </mxCell>
+                <mxCell id="407" value="RenderPass&lt;br&gt;command writers&lt;br&gt;with actual pipelines and descriptors&lt;br&gt;resources are pre-allocated" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3280" y="673.5" width="350" height="93" as="geometry"/>
+                </mxCell>
+                <mxCell id="409" value="RenderScene&lt;br&gt;receives updates from SimulateScene" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="3695" y="680" width="290" height="66" as="geometry"/>
+                </mxCell>
+                <mxCell id="410" value="SimulateScene" style="whiteSpace=wrap;html=1;fontFamily=Lucida Console;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="4090" y="680" width="220" height="66" as="geometry"/>
+                </mxCell>
+                <mxCell id="417" value="graphic_queue&lt;br&gt;graphic_queue_family" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="2860" y="844" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="418" value="window&lt;br&gt;instance&lt;br&gt;debug_messenger" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="2890" y="913.5" width="120" height="53" as="geometry"/>
+                </mxCell>
+                <mxCell id="419" value="chosen_GPU" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="2890" y="990" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="420" value="surface" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="2895" y="1040" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="421" value="swapchain&lt;br&gt;swapchain_images&lt;br&gt;swapchain_extent" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3060" y="854" width="140" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="422" value="imm_cmd_pool&lt;br&gt;imm_cmd&lt;br&gt;imm_fence" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3060" y="940" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="423" value="scene data&lt;br&gt;vertex data&lt;br&gt;other data" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3775" y="800" width="120" height="66" as="geometry"/>
+                </mxCell>
+                <mxCell id="424" value="texture&lt;br&gt;sampler" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3290" y="819" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="425" value="vertex_buffer&lt;br&gt;index_buffer" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3290" y="880" width="120" height="47" as="geometry"/>
+                </mxCell>
+                <mxCell id="426" value="color_image&lt;br&gt;depth_image" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3290" y="950" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="427" value="desc_set_layouts" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3450" y="824" width="155" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="428" value="descriptor_allocator" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3060" y="1040" width="155" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="429" value="render_pass" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3470" y="950" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="430" value="pipeline_layout&lt;br&gt;pipeline" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3470" y="884" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="431" value="frame_buffer" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3300" y="1020" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="432" value="double cmd buffers" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="2965" y="1110" width="155" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="434" value="other databuffers" style="whiteSpace=wrap;html=1;rounded=1;fontFamily=Lucida Console;" vertex="1" parent="1">
+                    <mxGeometry x="3460" y="1020" width="180" height="30" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

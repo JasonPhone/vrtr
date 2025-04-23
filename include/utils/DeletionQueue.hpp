@@ -1,5 +1,6 @@
 #pragma once
 #include <stack>
+#include <functional>
 
 struct DeletionQueue {
   std::stack<std::function<void()>> delete_callbacks;

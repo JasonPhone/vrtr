@@ -19,6 +19,10 @@ public:
     m_ci_buffer.usage |= usage;
     return *this;
   }
+  BufferBuilder &setBufferUsage(VkBufferUsageFlags usage) {
+    m_ci_buffer.usage = usage;
+    return *this;
+  }
   BufferBuilder &setMemoryUsage(VmaMemoryUsage usage) {
     m_ci_alloc.usage = usage;
     return *this;

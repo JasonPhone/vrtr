@@ -17,10 +17,6 @@ namespace vrtr {
 void GPU::init(SDL_Window *window) {
   LOGI("GPU init.");
   m_window = window;
-  int w, h;
-  SDL_GetWindowSize(m_window, &w, &h);
-  m_window_extent.width = w;
-  m_window_extent.height = h;
 
   initVulkan();
   initSwapchain();
@@ -32,6 +28,7 @@ void GPU::init(SDL_Window *window) {
   initPipelines();
   initFrameBuffers();
   initTextures();
+  initRenderGraph();
 }
 
 void GPU::initVulkan() {
@@ -103,17 +100,19 @@ void GPU::initVulkan() {
 }
 
 void GPU::initSwapchain() {
-  createSwapchain(m_window_extent.width, m_window_extent.height);
+  int w, h;
+  SDL_GetWindowSize(m_window, &w, &h);
+  createSwapchain(w, h);
   m_deletion_queue.push([&]() { destroySwapchain(); });
 }
 
 void GPU::createSwapchain(int w, int h) {
   vkb::SwapchainBuilder swapchainBuilder{m_chosen_GPU, m_device, m_surface};
-  m_swapchain_format = VK_FORMAT_B8G8R8A8_UNORM;
+  auto swapchain_format = VK_FORMAT_B8G8R8A8_UNORM;
   vkb::Swapchain vkbSwapchain =
       swapchainBuilder
           .set_desired_format(VkSurfaceFormatKHR{
-              .format = m_swapchain_format,
+              .format = swapchain_format,
               .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
           // use v-sync present mode
           .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
@@ -125,13 +124,13 @@ void GPU::createSwapchain(int w, int h) {
   m_swapchain_extent = vkbSwapchain.extent;
   m_swapchain = vkbSwapchain.swapchain;
   m_swapchain_images = vkbSwapchain.get_images().value();
-  m_swapchain_image_views = vkbSwapchain.get_image_views().value();
+  // m_swapchain_image_views = vkbSwapchain.get_image_views().value();
 }
 void GPU::destroySwapchain() {
   vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-  for (size_t i = 0; i < m_swapchain_image_views.size(); i++) {
-    vkDestroyImageView(m_device, m_swapchain_image_views[i], nullptr);
-  }
+  // for (size_t i = 0; i < m_swapchain_image_views.size(); i++) {
+  //   vkDestroyImageView(m_device, m_swapchain_image_views[i], nullptr);
+  // }
 }
 
 void GPU::initOffScreenImages() {
@@ -540,9 +539,6 @@ void GPU::draw() {
                        m_swapchain_extent);
     vkimage::transitionImage(cmd, m_swapchain_images[swapchain_img_idx],
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    vkimage::transitionImage(cmd, m_swapchain_images[swapchain_img_idx],
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                              VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
   }
   VK_CHECK(vkEndCommandBuffer(cmd));
@@ -648,7 +644,8 @@ void GPU::uploadScene(const Scene &scene) {
           builder.setSize(vertices_size)
               .addBufferUsage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
               .addBufferUsage(VK_BUFFER_USAGE_TRANSFER_DST_BIT)
-              /// TODO Use Buffer Device Address to upload vertices.
+              /// TODO Use Buffer Device Address and push constants to upload
+              /// vertices.
               // .addBufferUsage(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
               .setMemoryUsage(VMA_MEMORY_USAGE_GPU_ONLY)
               .build(m_mem_allocator);
@@ -773,6 +770,7 @@ AllocatedImage GPU::uploadImage(void *data, VkExtent3D size, VkFormat format,
 }
 
 void GPU::initTextures() {
+  LOGD("Init textures.");
   int w, h, n_channels;
   /// TODO Check if mipmap is real.
   bool mipmap = true;
@@ -805,6 +803,35 @@ void GPU::initTextures() {
     vkDestroySampler(m_device, m_default_sampler_linear, nullptr);
     vkDestroySampler(m_device, m_default_sampler_nearest, nullptr);
   });
+}
+
+void GPU::initRenderGraph() {
+  /// Resources.
+  auto vertex_buffer = std::make_shared<rdg::BufferNode>("vertex buffer");
+  auto index_buffer = std::make_shared<rdg::BufferNode>("index buffer");
+  auto texture = std::make_shared<rdg::ImageNode>("texture");
+  auto scene_data = std::make_shared<rdg::BufferNode>("scene_data buffer");
+  auto color_image = std::make_shared<rdg::ImageNode>("color image");
+  auto depth_image = std::make_shared<rdg::ImageNode>("depth image");
+  auto swapchain_image = std::make_shared<rdg::ImageNode>("swapchain image");
+  /// Passes.
+  m_render_graph.addPass(
+      "simple draw", {vertex_buffer, index_buffer, texture, scene_data},
+      {color_image, depth_image},
+      [&](rdg::PassContext &context) { LOGD("pass executed"); });
+  m_render_graph.addPass(
+      "image copy", {color_image}, {swapchain_image},
+      [&](rdg::PassContext &context) { LOGD("pass executed"); });
+
+  m_render_graph.compile(m_device, m_mem_allocator);
+  rdg::PassContext context{
+      .graph = m_render_graph,
+      .cmd_buffer = m_imm_cmd,
+      .device = m_device,
+      .allocator = m_mem_allocator,
+  };
+
+  m_render_graph.execute(context);
 }
 
 void GPU::immediateSubmit(std::function<void(VkCommandBuffer cmd)> &&func) {

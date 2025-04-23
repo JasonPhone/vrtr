@@ -24,6 +24,10 @@ public:
     m_extent.depth = depth;
     return *this;
   }
+  ImageBuilder &setExtent(VkExtent3D &extent) {
+    m_extent = extent;
+    return *this;
+  }
   ImageBuilder &setFormat(VkFormat format) {
     m_format = format;
     return *this;

@@ -13,6 +13,7 @@ Render pass and dynamic rendering.
 ## Function
 
 - [x] detailed compute pipeline for data processing. See branch `var.compute`
+- [ ] RDG, move to vulkan.hpp
 - [ ] deferred rendering.
 - [ ] Reversed-z: projection mat, depth compare operator, depth attachment clear value.
 - [ ] GPU-driven, pbr ibl, cascaded shadow mapping.
@@ -41,6 +42,21 @@ Can mitigate z-fighting because
 
 By now (1419b16) the descriptor set is used to bind output image of compute shader.
 
+# pipelines and render pass
+
+Actual binding:
+- `VkRenderPass`, `VkFrameBuffer` to begin a render pass
+- `VkPipeline` to bind a pipeline, `VkPipelineLayout` to set pipeline IO.
+
+## Build a render pass
+
+## Build a pipeline
+
+`VkGraphicsPipelineCreateInfo`, typical:
+- shader stage create infos, where `VkShaderModule` is filled.
+- vertex input state
+  - relies on scene data structure
+  - can be empty if vertices are sent using VBA
 
 # System Procedure
 
