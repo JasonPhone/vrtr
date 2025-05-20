@@ -6,11 +6,12 @@
 #include "RDG/RenderGraph.hpp"
 
 #include <SDL3/SDL.h>
+#include <vector>
 #include <vulkan/vulkan.h>
 
 namespace vrtr {
 constexpr bool kUseValidation = true;
-constexpr int kFrameOverlap = 2;
+constexpr int kFrameOverlap = 3;
 
 class GPU {
 public:
@@ -51,9 +52,9 @@ private:
   void initCommands();
   void initSyncStructures();
   FrameData &getCurrentFrame() {
-    return m_frames[m_frame_number % kFrameOverlap];
+    return m_frames[m_frame_number % m_frames.size()];
   }
-  FrameData m_frames[kFrameOverlap];
+  std::vector<FrameData> m_frames;
   size_t m_frame_number = 0;
   VkFence m_imm_fence;
   VkCommandBuffer m_imm_cmd;
@@ -82,7 +83,7 @@ private:
 
   void initFrameBuffers();
 
-  void recordCmdBuffer(VkCommandBuffer cmd);
+  void recordCmdBuffer(FrameData& frame);
 
   void initTextures();
   AllocatedImage m_texture;

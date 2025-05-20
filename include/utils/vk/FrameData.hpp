@@ -9,9 +9,9 @@ struct FrameData {
   VkCommandBuffer cmd_buffer_main;
 
   // https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
-  // Sync between GPU queues, one operation wait another to signal a semaphore.
-  VkSemaphore swapchain_semaphore, render_semaphore; // Two one-way channels.
-  // Sync between CPU and GPU, CPU waits for some GPU operations to finish.
+  // Sem: Sync between GPU queues, one operation wait another to signal a semaphore.
+  VkSemaphore image_available_semaphore, render_finished_semaphore; // Two one-way channels.
+  // Fen: Sync between CPU and GPU, CPU waits for some GPU operations to finish.
   VkFence render_fence;
 
   DeletionQueue deletion_queue;
