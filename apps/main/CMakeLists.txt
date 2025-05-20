@@ -13,7 +13,7 @@ if(WIN32)
   set(HEADER_DIR "${CMAKE_SOURCE_DIR}/include")
   set(SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 
-  set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
+  # set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
   find_package(Vulkan REQUIRED)
 
   add_library(${PROJECT_NAME}_runtime STATIC

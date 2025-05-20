@@ -11,7 +11,7 @@ add_library(${PROJECT_NAME}
   ./vma.cpp
 )
 
-set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
+# set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
 find_package(Vulkan REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PRIVATE

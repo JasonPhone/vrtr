@@ -5,7 +5,7 @@
 		}
 	],
 	"settings": {
-    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.generator": "Ninja",
 		"cSpell.words": [
       "binfo",
       "descriptorset",
@@ -42,6 +42,7 @@
     ],
     "cSpell.enableFiletypes": [
       "glsl"
-    ]
+    ],
+    "clangd.arguments": ["-header-insertion=never"]
 	}
 }
