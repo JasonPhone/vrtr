@@ -39,7 +39,7 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/tinyobjloader
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
-    ${CMAKE_SOURCE_DIR}/extern/fmt/include
+    # ${CMAKE_SOURCE_DIR}/extern/fmt/include
     ${CMAKE_SOURCE_DIR}/extern/fastgltf/include
 
     # ${CMAKE_SOURCE_DIR}/extern/spdlog/include
@@ -59,7 +59,7 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/tinyobjloader
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
-    ${CMAKE_SOURCE_DIR}/extern/fmt/include
+    # ${CMAKE_SOURCE_DIR}/extern/fmt/include
     ${CMAKE_SOURCE_DIR}/extern/json/include
 
     # ${CMAKE_SOURCE_DIR}/extern/spdlog/include
@@ -80,7 +80,7 @@ if(WIN32)
     spdlog
 
     # vma # Impl in ./src/vk_engine.cpp
-    fmt::fmt
+    # fmt::fmt
 
     # Project binaries.
     ${PROJECT_NAME}_runtime

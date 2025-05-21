@@ -412,11 +412,11 @@ void GPU::initGraphicPipeline() {
   VkShaderModule triangle_vert{};
   if (!vkutil::loadShaderModule("../../assets/shaders/spv/default.vert.spv",
                                 m_device, &triangle_vert))
-    fmt::println("failed loading shader");
+    LOGE("failed loading shader");
   VkShaderModule triangle_frag{};
   if (!vkutil::loadShaderModule("../../assets/shaders/spv/default.frag.spv",
                                 m_device, &triangle_frag))
-    fmt::println("failed loading shader");
+    LOGE("failed loading shader");
   VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
   vertShaderStageInfo.sType =
       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -498,22 +498,22 @@ void GPU::initFrameBuffers() {
 }
 
 void GPU::draw() {
-  LOGD("wait render fence of frame[{}]({:X})", m_frame_number,
-       uint64_t(m_frames[m_frame_number].render_fence));
+  // LOGD("wait render fence of frame[{}]({:X})", m_frame_number,
+  //      uint64_t(m_frames[m_frame_number].render_fence));
   VK_CHECK(vkWaitForFences(m_device, 1, &m_frames[m_frame_number].render_fence,
                            true, VK_ONE_SEC));
   // Free objects dedicated to this frame (in last iteration).
   m_frames[m_frame_number].deletion_queue.flush();
   m_frames[m_frame_number].descriptor_allocator.clearPools(m_device);
-  LOGD("reset render fence of frame[{}]({:X}) to unsignaled", m_frame_number,
-       uint64_t(m_frames[m_frame_number].render_fence));
+  // LOGD("reset render fence of frame[{}]({:X}) to unsignaled", m_frame_number,
+  //      uint64_t(m_frames[m_frame_number].render_fence));
   VK_CHECK(vkResetFences(m_device, 1, &m_frames[m_frame_number].render_fence));
 
   // Request an image to draw to.
   uint32_t swapchain_img_idx = 0;
   // Will signal the semaphore.
-  LOGD("acquire swp image, wait sem of frame[{}]({:X})", m_frame_number,
-       uint64_t(m_frames[m_frame_number].image_presented_semaphore));
+  // LOGD("acquire swp image, wait sem of frame[{}]({:X}) (to be signaled by presentation engine)", m_frame_number,
+  //      uint64_t(m_frames[m_frame_number].image_presented_semaphore));
   VkResult e =
       vkAcquireNextImageKHR(m_device, m_swapchain, VK_ONE_SEC,
                             m_frames[m_frame_number].image_presented_semaphore,
@@ -521,10 +521,10 @@ void GPU::draw() {
   if (e == VK_ERROR_OUT_OF_DATE_KHR) {
     LOGE("No impl for swapchain resizing.");
   }
-  LOGD("acquired swp image idx {}", swapchain_img_idx);
+  // LOGD("acquired swp image idx {}", swapchain_img_idx);
 
   // Clear the cmd buffer.
-  LOGD("recording to frame[{}]", m_frame_number);
+  // LOGD("recording to frame[{}]", m_frame_number);
   VkCommandBuffer cmd = m_frames[m_frame_number].cmd_buffer_main;
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
   // Record cmd. Bit is to tell vulkan buffer is used exactly once.
@@ -556,41 +556,33 @@ void GPU::draw() {
 
   // Submit commands.
   VkCommandBufferSubmitInfo cmd_submit_info = vkinit::cmdBufferSubmitInfo(cmd);
-  LOGD("submit waits for sem of frame[{}]({:X})", m_frame_number,
-       uint64_t(m_frames[m_frame_number].image_presented_semaphore));
+  // LOGD("submit waits for sem of frame[{}]({:X})", m_frame_number,
+  //      uint64_t(m_frames[m_frame_number].image_presented_semaphore));
   VkSemaphoreSubmitInfo wait_info = vkinit::semaphoreSubmitInfo(
       VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
       m_frames[m_frame_number].image_presented_semaphore);
   // LOGD("submit will signal sem of frame[{}]({:X})", swapchain_img_idx,
   //      uint64_t(m_frames[swapchain_img_idx].present_ready_semaphore));
-  // VkSemaphoreSubmitInfo signal_info = vkinit::semaphoreSubmitInfo(
-  //     VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-  //     m_frames[swapchain_img_idx].present_ready_semaphore);
-  LOGD("submit will signal sem of frame[{}]({:X})", m_frame_number,
-       uint64_t(m_frames[m_frame_number].present_ready_semaphore));
   VkSemaphoreSubmitInfo signal_info = vkinit::semaphoreSubmitInfo(
       VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-      m_frames[m_frame_number].present_ready_semaphore);
+      m_frames[swapchain_img_idx].present_ready_semaphore);
   VkSubmitInfo2 submit_info =
       vkinit::submitInfo(&cmd_submit_info, &signal_info, &wait_info);
-  LOGD("submit will signal fen of frame[{}]({:X})", m_frame_number,
-       uint64_t(m_frames[m_frame_number].render_fence));
+  // LOGD("submit will signal fen of frame[{}]({:X})", m_frame_number,
+  //      uint64_t(m_frames[m_frame_number].render_fence));
   VK_CHECK(vkQueueSubmit2(m_graphic_queue, 1, &submit_info,
                           m_frames[m_frame_number].render_fence));
 
   // Present image.
   // LOGD("present waits for sem of frame[{}]({:X})\n", swapchain_img_idx,
   //      uint64_t(m_frames[swapchain_img_idx].present_ready_semaphore));
-  LOGD("present waits for sem of frame[{}]({:X})\n", m_frame_number,
-       uint64_t(m_frames[m_frame_number].present_ready_semaphore));
   VkPresentInfoKHR present_info = vkinit::presentInfo();
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   present_info.pNext = nullptr;
   present_info.pSwapchains = &m_swapchain;
   present_info.swapchainCount = 1;
   present_info.pWaitSemaphores =
-      &m_frames[m_frame_number].present_ready_semaphore;
-      // &m_frames[swapchain_img_idx].present_ready_semaphore;
+      &m_frames[swapchain_img_idx].present_ready_semaphore;
   present_info.waitSemaphoreCount = 1;
   present_info.pImageIndices = &swapchain_img_idx;
 

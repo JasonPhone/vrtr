@@ -8,7 +8,7 @@ bool vkutil::loadShaderModule(const char *file_path, VkDevice device,
   // Open the file with cursor at the end.
   std::ifstream file(file_path, std::ios::ate | std::ios::binary);
   if (!file.is_open()) {
-    fmt::print("Error reading shader file {}\n", file_path);
+    LOGE("Error reading shader file {}\n", file_path);
     return false;
   }
   // Find size of the file by looking up the location of the cursor.
@@ -33,7 +33,7 @@ bool vkutil::loadShaderModule(const char *file_path, VkDevice device,
   VkShaderModule shader_module;
   if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) !=
       VK_SUCCESS) {
-    fmt::print("Error creating shader module from {}\n", file_path);
+    LOGE("Error creating shader module from {}\n", file_path);
     return false;
   }
   *out_shader_module = shader_module;
@@ -106,7 +106,7 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device) {
   VkPipeline pipeline = VK_NULL_HANDLE;
   if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &ci_pipeline,
                                 nullptr, &pipeline) != VK_SUCCESS) {
-    fmt::println("Error creating pipeline.");
+    LOGE("Error creating pipeline.");
   }
   return pipeline;
 }

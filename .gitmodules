@@ -19,9 +19,9 @@
 [submodule "extern/VMA"]
 	path = extern/VMA
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-[submodule "extern/fmt"]
-	path = extern/fmt
-	url = https://github.com/fmtlib/fmt.git
+# [submodule "extern/fmt"]
+# 	path = extern/fmt
+# 	url = https://github.com/fmtlib/fmt.git
 [submodule "extern/fastgltf"]
 	path = extern/fastgltf
 	url = https://github.com/spnda/fastgltf
