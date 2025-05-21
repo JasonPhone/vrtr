@@ -28,7 +28,7 @@ void GPU::init(SDL_Window *window) {
   initPipelines();
   initFrameBuffers();
   initTextures();
-  initRenderGraph();
+  // initRenderGraph();
 }
 
 void GPU::initVulkan() {
@@ -125,6 +125,7 @@ void GPU::createSwapchain(int w, int h) {
   m_swapchain_extent = vkbSwapchain.extent;
   m_swapchain = vkbSwapchain.swapchain;
   m_swapchain_images = vkbSwapchain.get_images().value();
+  LOGD("#swp images: {}", m_swapchain_images.size());
   // m_swapchain_image_views = vkbSwapchain.get_image_views().value();
 }
 void GPU::destroySwapchain() {
@@ -202,9 +203,9 @@ void GPU::initSyncStructures() {
     VK_CHECK(
         vkCreateFence(m_device, &ci_fence, nullptr, &m_frames[i].render_fence));
     VK_CHECK(vkCreateSemaphore(m_device, &ci_semaphore, nullptr,
-                               &m_frames[i].image_available_semaphore));
+                               &m_frames[i].image_presented_semaphore));
     VK_CHECK(vkCreateSemaphore(m_device, &ci_semaphore, nullptr,
-                               &m_frames[i].render_finished_semaphore));
+                               &m_frames[i].present_ready_semaphore));
   }
   VK_CHECK(vkCreateFence(m_device, &ci_fence, nullptr, &m_imm_fence));
   m_deletion_queue.push(
@@ -497,25 +498,34 @@ void GPU::initFrameBuffers() {
 }
 
 void GPU::draw() {
-  VK_CHECK(vkWaitForFences(m_device, 1, &getCurrentFrame().render_fence, true,
-                           VK_ONE_SEC));
+  LOGD("wait render fence of frame[{}]({:X})", m_frame_number,
+       uint64_t(m_frames[m_frame_number].render_fence));
+  VK_CHECK(vkWaitForFences(m_device, 1, &m_frames[m_frame_number].render_fence,
+                           true, VK_ONE_SEC));
   // Free objects dedicated to this frame (in last iteration).
-  getCurrentFrame().deletion_queue.flush();
-  getCurrentFrame().descriptor_allocator.clearPools(m_device);
-  VK_CHECK(vkResetFences(m_device, 1, &getCurrentFrame().render_fence));
+  m_frames[m_frame_number].deletion_queue.flush();
+  m_frames[m_frame_number].descriptor_allocator.clearPools(m_device);
+  LOGD("reset render fence of frame[{}]({:X}) to unsignaled", m_frame_number,
+       uint64_t(m_frames[m_frame_number].render_fence));
+  VK_CHECK(vkResetFences(m_device, 1, &m_frames[m_frame_number].render_fence));
 
   // Request an image to draw to.
   uint32_t swapchain_img_idx = 0;
   // Will signal the semaphore.
-  VkResult e = vkAcquireNextImageKHR(
-      m_device, m_swapchain, VK_ONE_SEC,
-      getCurrentFrame().image_available_semaphore, nullptr, &swapchain_img_idx);
+  LOGD("acquire swp image, wait sem of frame[{}]({:X})", m_frame_number,
+       uint64_t(m_frames[m_frame_number].image_presented_semaphore));
+  VkResult e =
+      vkAcquireNextImageKHR(m_device, m_swapchain, VK_ONE_SEC,
+                            m_frames[m_frame_number].image_presented_semaphore,
+                            nullptr, &swapchain_img_idx);
   if (e == VK_ERROR_OUT_OF_DATE_KHR) {
-    LOGE("swapchain unavailable.");
+    LOGE("No impl for swapchain resizing.");
   }
+  LOGD("acquired swp image idx {}", swapchain_img_idx);
 
   // Clear the cmd buffer.
-  VkCommandBuffer cmd = getCurrentFrame().cmd_buffer_main;
+  LOGD("recording to frame[{}]", m_frame_number);
+  VkCommandBuffer cmd = m_frames[m_frame_number].cmd_buffer_main;
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
   // Record cmd. Bit is to tell vulkan buffer is used exactly once.
   VkCommandBufferBeginInfo cmd_begin_info =
@@ -528,7 +538,7 @@ void GPU::draw() {
     vkimage::transitionImage(cmd, m_color_image.image,
                              VK_IMAGE_LAYOUT_UNDEFINED,
                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    recordCmdBuffer(getCurrentFrame());
+    recordCmdBuffer(m_frames[m_frame_number]);
     vkimage::transitionImage(cmd, m_color_image.image,
                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -546,32 +556,41 @@ void GPU::draw() {
 
   // Submit commands.
   VkCommandBufferSubmitInfo cmd_submit_info = vkinit::cmdBufferSubmitInfo(cmd);
+  LOGD("submit waits for sem of frame[{}]({:X})", m_frame_number,
+       uint64_t(m_frames[m_frame_number].image_presented_semaphore));
   VkSemaphoreSubmitInfo wait_info = vkinit::semaphoreSubmitInfo(
       VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
-      getCurrentFrame().image_available_semaphore);
+      m_frames[m_frame_number].image_presented_semaphore);
+  // LOGD("submit will signal sem of frame[{}]({:X})", swapchain_img_idx,
+  //      uint64_t(m_frames[swapchain_img_idx].present_ready_semaphore));
+  // VkSemaphoreSubmitInfo signal_info = vkinit::semaphoreSubmitInfo(
+  //     VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+  //     m_frames[swapchain_img_idx].present_ready_semaphore);
+  LOGD("submit will signal sem of frame[{}]({:X})", m_frame_number,
+       uint64_t(m_frames[m_frame_number].present_ready_semaphore));
   VkSemaphoreSubmitInfo signal_info = vkinit::semaphoreSubmitInfo(
       VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-      // getCurrentFrame().render_finished_semaphore
-      m_frames[swapchain_img_idx].render_finished_semaphore
-    );
+      m_frames[m_frame_number].present_ready_semaphore);
   VkSubmitInfo2 submit_info =
       vkinit::submitInfo(&cmd_submit_info, &signal_info, &wait_info);
-  LOGI("swp {}, cur {} semaphore image available {:X}, render finished {:X}",
-       swapchain_img_idx, m_frame_number % m_frames.size(),
-       uint64_t(getCurrentFrame().image_available_semaphore),
-       uint64_t(m_frames[swapchain_img_idx].render_finished_semaphore));
+  LOGD("submit will signal fen of frame[{}]({:X})", m_frame_number,
+       uint64_t(m_frames[m_frame_number].render_fence));
   VK_CHECK(vkQueueSubmit2(m_graphic_queue, 1, &submit_info,
-                          getCurrentFrame().render_fence));
+                          m_frames[m_frame_number].render_fence));
 
   // Present image.
+  // LOGD("present waits for sem of frame[{}]({:X})\n", swapchain_img_idx,
+  //      uint64_t(m_frames[swapchain_img_idx].present_ready_semaphore));
+  LOGD("present waits for sem of frame[{}]({:X})\n", m_frame_number,
+       uint64_t(m_frames[m_frame_number].present_ready_semaphore));
   VkPresentInfoKHR present_info = vkinit::presentInfo();
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   present_info.pNext = nullptr;
   present_info.pSwapchains = &m_swapchain;
   present_info.swapchainCount = 1;
   present_info.pWaitSemaphores =
-      // &getCurrentFrame().render_finished_semaphore;
-      &m_frames[swapchain_img_idx].render_finished_semaphore;
+      &m_frames[m_frame_number].present_ready_semaphore;
+      // &m_frames[swapchain_img_idx].present_ready_semaphore;
   present_info.waitSemaphoreCount = 1;
   present_info.pImageIndices = &swapchain_img_idx;
 
@@ -580,7 +599,7 @@ void GPU::draw() {
     LOGE("No impl for swapchain resizing.");
   }
 
-  m_frame_number++;
+  m_frame_number = (m_frame_number + 1) % m_frames.size();
 }
 
 void GPU::recordCmdBuffer(FrameData &frame) {
@@ -608,8 +627,8 @@ void GPU::recordCmdBuffer(FrameData &frame) {
     VkDescriptorSet frame_ds = frame.descriptor_allocator.allocate(
         m_device, m_desc_set_layouts.scene_data);
     DescriptorWriter writer;
-    writer.writeBuffer(0, frame.scene_data_buffer.buffer,
-                       sizeof(SceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.writeBuffer(0, frame.scene_data_buffer.buffer, sizeof(SceneData), 0,
+                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.writeImage(1, m_texture.view, m_default_sampler_linear,
                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -872,9 +891,9 @@ void GPU::deinit() {
     // Cmd buffer is destroyed with pool it comes from.
     vkDestroyCommandPool(m_device, m_frames[i].cmd_pool, nullptr);
     vkDestroyFence(m_device, m_frames[i].render_fence, nullptr);
-    vkDestroySemaphore(m_device, m_frames[i].image_available_semaphore,
+    vkDestroySemaphore(m_device, m_frames[i].image_presented_semaphore,
                        nullptr);
-    vkDestroySemaphore(m_device, m_frames[i].render_finished_semaphore,
+    vkDestroySemaphore(m_device, m_frames[i].present_ready_semaphore,
                        nullptr);
     m_frames[i].scene_data_buffer.destroy();
     m_frames[i].deletion_queue.flush();
