@@ -42,6 +42,6 @@ public:
 private:
   std::queue<Entity> mAvailableEntities{};
   std::array<Signature, MAX_ENTITIES> mEntitySignatures{};
-  uint32_t mNumRegisteredEntities = 0;
+  size_t mNumRegisteredEntities = 0;
 };
 } // namespace vrtr::ECS

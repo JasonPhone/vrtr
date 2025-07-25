@@ -5,8 +5,8 @@
 #include <glm/gtc/quaternion.hpp>
 
 namespace vrtr::ECS {
-using ComponentSignature = uint32_t; // To indicate the component type.
-constexpr ComponentSignature MAX_COMPONENTS = 64;
+using ComponentType = uint32_t; // To indicate the component type.
+constexpr ComponentType MAX_COMPONENTS = 64;
 using Signature = std::bitset<MAX_COMPONENTS>;
 
 struct TransformComponent {
