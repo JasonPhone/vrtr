@@ -40,6 +40,31 @@ bool vkutil::loadShaderModule(const char *file_path, VkDevice device,
   return true;
 }
 
+vk::raii::ShaderModule vkutil::loadShaderModule(const char *file_path, const vk::raii::Device& device) {
+  // Open the file with cursor at the end.
+  std::ifstream file(file_path, std::ios::ate | std::ios::binary);
+  if (!file.is_open()) {
+    LOGE("Error reading shader file {}\n", file_path);
+  }
+  // Find size of the file by looking up the location of the cursor.
+  // Because the cursor is at the end, it gives the size directly in bytes.
+  size_t fileSize = (size_t)file.tellg();
+  // Spirv expects the buffer to be in uint32, so make sure to reserve a int.
+  // Should be big enough for the entire file.
+  std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+  // Put file cursor at beginning.
+  file.seekg(0);
+  // Load the entire file into the buffer.
+  file.read((char *)buffer.data(), fileSize);
+  file.close();
+
+  // Create a new shader module, using the buffer we loaded.
+  vk::ShaderModuleCreateInfo shaderModuleCi{};
+  shaderModuleCi.setCode(buffer);
+
+  return device.createShaderModule(shaderModuleCi);
+}
+
 void PipelineBuilder::clear() {
   ci_shader_stages.clear();
   ci_input_asm = {

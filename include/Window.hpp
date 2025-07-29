@@ -12,9 +12,11 @@ public:
 
   std::vector<const char *> GetRequiredExtensions() const;
 
-  SDL_Window *getSDLHandle() const;
+  SDL_Window *GetSDLHandle() const;
 
   VkSurfaceKHR CreateCurface(VkInstance instance) const;
+
+  VkExtent2D GetWindowSize() const;
 
 private:
   SDL_Window *mWindow;

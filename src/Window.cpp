@@ -1,4 +1,5 @@
 #include "Window.hpp"
+#include <SDL3/SDL_vulkan.h>
 
 void vrtr::Window::init(const Json &config) {
   SDL_Init(SDL_INIT_VIDEO);
@@ -21,7 +22,14 @@ std::vector<const char *> vrtr::Window::GetRequiredExtensions() const {
   std::vector<const char *> extVec{sdlExtPtr, sdlExtPtr + sdlExtCount};
   return extVec;
 }
-SDL_Window *vrtr::Window::getSDLHandle() const { return mWindow; }
+SDL_Window *vrtr::Window::GetSDLHandle() const { return mWindow; }
+
+VkExtent2D vrtr::Window::GetWindowSize() const {
+  int w, h;
+  SDL_GetWindowSize(mWindow, &w, &h);
+  return VkExtent2D{.width = static_cast<uint32_t>(w),
+                    .height = static_cast<uint32_t>(h)};
+}
 
 VkSurfaceKHR vrtr::Window::CreateCurface(VkInstance instance) const {
   // TODO Error check.

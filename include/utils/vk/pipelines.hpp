@@ -1,9 +1,12 @@
 #pragma once
 #include "utils/vk/common.hpp"
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
 
 namespace vkutil {
 bool loadShaderModule(const char *file_path, VkDevice device,
                       VkShaderModule *out_shader_module);
+vk::raii::ShaderModule loadShaderModule(const char *file_path, const vk::raii::Device& device);
 }
 
 struct PipelineBuilder {
