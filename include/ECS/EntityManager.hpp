@@ -12,21 +12,21 @@ public:
   EntityManager() {
     LOGI("entity manager");
     for (Entity e = 0; e < MAX_ENTITIES; e++)
-      mAvailableEntities.push(e);
+      mEntityPool.push(e);
   }
 
   Entity RegisterEntity() {
-    assert(mNumRegisteredEntities < MAX_ENTITIES);
-    Entity e = mAvailableEntities.front();
-    mAvailableEntities.pop();
-    mNumRegisteredEntities++;
+    assert(mNumEntities < MAX_ENTITIES);
+    Entity e = mEntityPool.front();
+    mEntityPool.pop();
+    mNumEntities++;
     return e;
   }
   void UnregisterEntity(Entity e) {
     assert(e < MAX_ENTITIES);
     mEntitySignatures[e].reset();
-    mAvailableEntities.push(e);
-    mNumRegisteredEntities--;
+    mEntityPool.push(e);
+    mNumEntities--;
   }
 
   void SetSignature(Entity e, Signature signature) {
@@ -40,8 +40,8 @@ public:
   }
 
 private:
-  std::queue<Entity> mAvailableEntities{};
+  std::queue<Entity> mEntityPool{};
   std::array<Signature, MAX_ENTITIES> mEntitySignatures{};
-  size_t mNumRegisteredEntities = 0;
+  size_t mNumEntities = 0;
 };
 } // namespace vrtr::ECS

@@ -21,7 +21,8 @@ public:
   virtual void EntityDestroyed(const Entity &entity) = 0;
 };
 
-template <typename T> class ComponentArray : public IComponentArray {
+template <typename T> 
+class ComponentArray : public IComponentArray {
 public:
   void AddComponent(const Entity &entity, T component) {
     if (mComponentIndexDict.find(entity) != mComponentIndexDict.end()) {

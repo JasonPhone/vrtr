@@ -10,7 +10,8 @@
 namespace vrtr::ECS {
 class ComponentManager {
 public:
-  template <typename T> void RegisterComponent() {
+  template <typename T>
+  void RegisterComponent() {
     auto typeStr = typeid(T).name();
     if (mRegisteredTypes.find(typeStr) != mRegisteredTypes.end()) {
       LOGE("component type {} already registered", typeStr);
@@ -26,11 +27,13 @@ public:
     GetComponentArray<T>()->AddComponent(entity, component);
   }
 
-  template <typename T> void RemoveComponent(const Entity &entity) {
+  template <typename T>
+  void RemoveComponent(const Entity &entity) {
     GetComponentArray<T>()->RemoveComponent(entity);
   }
 
-  template <typename T> T &GetComponent(const Entity &entity) {
+  template <typename T>
+  T &GetComponent(const Entity &entity) {
     return GetComponentArray<T>()->GetComponent(entity);
   }
 
@@ -41,7 +44,8 @@ public:
     }
   }
 
-  template <typename T> ComponentType GetComponentType() {
+  template <typename T>
+  ComponentType GetComponentType() {
     auto typeStr = typeid(T).name();
     if (mRegisteredTypes.find(typeStr) == mRegisteredTypes.end())
       LOGE("component type {} not registered", typeStr);
@@ -54,7 +58,8 @@ private:
       mComponentArrays{};
   ComponentType mNextComponentType{};
 
-  template <typename T> std::shared_ptr<ComponentArray<T>> GetComponentArray() {
+  template <typename T>
+  std::shared_ptr<ComponentArray<T>> GetComponentArray() {
     auto typeString = typeid(T).name();
     if (mRegisteredTypes.find(typeString) == mRegisteredTypes.end())
       LOGE("component type {} not registered", typeString);

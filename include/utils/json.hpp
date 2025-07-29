@@ -1,7 +1,9 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
 #include "utils/log.hpp"
+
+#include <nlohmann/json.hpp>
+
 using Json = nlohmann::json;
 
 namespace vrtr {

@@ -18,6 +18,7 @@ if(WIN32)
 
   add_library(${PROJECT_NAME}_runtime STATIC
     ${SOURCE_DIR}/GPU/GPU.cpp
+    ${SOURCE_DIR}/Window.cpp
 
     ${SOURCE_DIR}/utils/vk/descriptors.cpp
     ${SOURCE_DIR}/utils/vk/images.cpp
@@ -39,8 +40,8 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/tinyobjloader
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
-    # ${CMAKE_SOURCE_DIR}/extern/fmt/include
     ${CMAKE_SOURCE_DIR}/extern/fastgltf/include
+    ${CMAKE_SOURCE_DIR}/extern/json/include
 
     # ${CMAKE_SOURCE_DIR}/extern/spdlog/include
     ${CMAKE_SOURCE_DIR}/include
@@ -59,7 +60,6 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/tinyobjloader
     ${CMAKE_SOURCE_DIR}/extern/vk-bootstrap/src
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
-    # ${CMAKE_SOURCE_DIR}/extern/fmt/include
     ${CMAKE_SOURCE_DIR}/extern/json/include
 
     # ${CMAKE_SOURCE_DIR}/extern/spdlog/include

@@ -1,0 +1,49 @@
+<mxfile host="65bd71144e">
+    <diagram id="9DKgVahRmi7qY-blzzaC" name="Page-1">
+        <mxGraphModel dx="840" dy="482" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="132" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="129" target="131">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="134" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="129" target="133">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="129" value="Platform" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="110" y="460" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="131" value="Window" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="100" y="560" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="136" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="133" target="135">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="133" value="Application" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="260" y="560" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="138" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="135" target="137">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="140" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="135" target="139">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="142" value="" style="edgeStyle=none;html=1;" edge="1" parent="1" source="135" target="141">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="135" value="RenderContext" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="460" y="560" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="137" value="RenderFrame[]" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="560" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="139" value="swapchain" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="650" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="141" value="multi-thread into" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="740" width="120" height="60" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
