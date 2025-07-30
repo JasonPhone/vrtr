@@ -32,6 +32,7 @@ public:
       mApplication.TickLogic(1000.f / 60);
       mApplication.TickRender(1000.f / 60);
     }
+    mApplication.WaitDevice();
   }
 
 private:

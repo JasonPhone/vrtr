@@ -6,8 +6,8 @@ void vrtr::Window::init(const Json &config) {
 
   int w = fetchRequired<int>(config, "width");
   int h = fetchRequired<int>(config, "height");
-  SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
-  // (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  SDL_WindowFlags window_flags =
+      (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
   mWindow = SDL_CreateWindow("Vulkan Engine", w, h, window_flags);
 }
 void vrtr::Window::deinit() { SDL_DestroyWindow(mWindow); }

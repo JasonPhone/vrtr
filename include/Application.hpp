@@ -1,11 +1,11 @@
 #pragma once
 
-#include "GPU/GPU.hpp"
 #include "Scene/Scene.hpp"
 #include "utils/json.hpp"
 #include "Window.hpp"
 #include "rendering/RenderContext.hpp"
 #include "utils/vk/pipelines.hpp"
+#include "utils/DeletionQueue.hpp"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -54,7 +54,9 @@ public:
     CreateRenderContext();
     LoadScene();
     CreateRenderPass();
+    CreateFramebuffer();
     CreateGraphicsPipeline();
+    CreateCommands();
     CreateCamera();
     CreateGui();
   }
@@ -69,24 +71,18 @@ public:
     // mScene.tick(delta);
   }
 
-  void TickRender(float delta) {
-    /**
-     * render context
-     *    begin frame, wait and acquire image in
-     * request cmd buffer
-     * update stats and gui
-     * do render
-     * present
-     */
-    // mGpu.updateScene(mScene);
-    // mGpu.draw();
-  }
+  void TickRender(float delta);
+
+  void WaitDevice() { mDevice.waitIdle(); }
 
 private:
   void CreateVulkan();
   void CreateRenderContext();
+  void CreateFramebuffer();
   void LoadScene();
-  void CreateRenderPass(); // TODO Remove this.
+  void CreateRenderPass();
+  void CreateCommands();
+  void RecreateSwapchain();
   void CreateGraphicsPipeline();
   void CreateCamera();
   void CreateGui();
@@ -94,8 +90,6 @@ private:
   // TODO Use unique_ptr?
   const Window *mWindow;
   Scene mScene;
-
-  GPU mGpu;
 
   vk::raii::Context mVkContext;
   // TODO See core/hpp_instance.h for more encapsule.
@@ -113,6 +107,7 @@ private:
   std::vector<vk::PresentModeKHR> presentModePriorityList{
       vk::PresentModeKHR::eFifo, vk::PresentModeKHR::eMailbox,
       vk::PresentModeKHR::eImmediate};
+  int mFramesInFlight;
   vk::raii::SwapchainKHR mSwapchain{nullptr};
   std::vector<vk::Image> mSwapchainImages;
   std::vector<vk::raii::ImageView> mSwapchainImageViews;
@@ -125,7 +120,12 @@ private:
   vk::raii::PipelineLayout mPipelineLayout{nullptr};
   vk::raii::Pipeline mGraphicsPipeline{nullptr};
 
-  DeletionQueue mDeletionQueue{};
+  vk::raii::CommandPool mCmdPool{nullptr};
+  std::vector<vk::raii::CommandBuffer> mCmdBuffers;
+  std::vector<vk::raii::Semaphore> mImageAvailableSemaphores;
+  std::vector<vk::raii::Semaphore> mRenderFinishedSemaphores;
+  std::vector<vk::raii::Fence> mInFlightFences;
+  uint32_t mCurrentFrame = 0;
 };
 } // namespace vrtr
 
@@ -381,8 +381,6 @@ inline void vrtr::Application::CreateVulkan() {
     mGraphicsQueue = mDevice.getQueue(indices.graphicsFamily.value(), 0);
     mPresentQueue = mDevice.getQueue(indices.presentFamily.value(), 0);
   }
-
-  mDeletionQueue.push([&]() {});
 }
 inline void vrtr::Application::CreateRenderContext() {
   // TODO Encapsule this.
@@ -421,14 +419,18 @@ inline void vrtr::Application::CreateRenderContext() {
     std::vector<uint32_t> queueFamilyIndices{graphicsFamily.value(),
                                              presentFamily.value()};
     if (graphicsFamily != presentFamily) {
+      LOGI("image sharing mode: concurrent");
       swapCi.setImageSharingMode(vk::SharingMode::eConcurrent)
           .setQueueFamilyIndices(queueFamilyIndices);
     } else {
+      LOGI("image sharing mode: exclusive");
       swapCi.setImageSharingMode(vk::SharingMode::eExclusive);
     }
 
     mSwapchain = mDevice.createSwapchainKHR(swapCi);
     mSwapchainImages = mSwapchain.getImages();
+    LOGD("#mSwapchainImages {}", mSwapchainImages.size());
+    mFramesInFlight = mSwapchainImages.size();
 
     mSwapchainImageFormat = surfaceFormat.format;
     mSwapchainExtent = extent;
@@ -479,32 +481,42 @@ inline void vrtr::Application::CreateRenderPass() {
         colorAttachmentRef,
     });
 
-    // Subpass dependency is omitted by now since there's only one subpass.
+    // Delay the auto transition to eColorAttachmentOutput stage.
+    vk::SubpassDependency dependency{};
+    dependency.srcSubpass = vk::SubpassExternal;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.srcAccessMask = {};
+    dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
 
     vk::RenderPassCreateInfo renderPassCi{};
-    renderPassCi.setAttachments({
-        colorAttachment,
-    });
-    renderPassCi.setSubpasses({
-        subpass,
-    });
+    renderPassCi
+        .setAttachments({
+            colorAttachment,
+        })
+        .setSubpasses({
+            subpass,
+        })
+        .setDependencies(dependency);
     mRenderPass = mDevice.createRenderPass(renderPassCi);
   }
-  {
-    LOGI("create frame buffers for swapchain");
-    mSwapchainFramebuffers.reserve(mSwapchainImageViews.size());
-    vk::FramebufferCreateInfo framebufferCi;
-    framebufferCi.renderPass = mRenderPass;
-    framebufferCi.width = mSwapchainExtent.width;
-    framebufferCi.height = mSwapchainExtent.height;
-    framebufferCi.layers = 1;
-    for (const auto &imageView : mSwapchainImageViews) {
-      framebufferCi.setAttachments({
-          *imageView,
-      });
-      mSwapchainFramebuffers.emplace_back(
-          mDevice.createFramebuffer(framebufferCi));
-    }
+}
+
+inline void vrtr::Application::CreateFramebuffer() {
+  LOGI("create frame buffers for swapchain");
+  mSwapchainFramebuffers.reserve(mSwapchainImageViews.size());
+  vk::FramebufferCreateInfo framebufferCi;
+  framebufferCi.renderPass = mRenderPass;
+  framebufferCi.width = mSwapchainExtent.width;
+  framebufferCi.height = mSwapchainExtent.height;
+  framebufferCi.layers = 1;
+  for (const auto &imageView : mSwapchainImageViews) {
+    framebufferCi.setAttachments({
+        *imageView,
+    });
+    mSwapchainFramebuffers.emplace_back(
+        mDevice.createFramebuffer(framebufferCi));
   }
 }
 inline void vrtr::Application::CreateGraphicsPipeline() {
@@ -606,10 +618,149 @@ inline void vrtr::Application::CreateGraphicsPipeline() {
     pipelineInfo.basePipelineIndex = -1;       // Optional
 
     mGraphicsPipeline = mDevice.createGraphicsPipeline(nullptr, pipelineInfo);
-    mDeletionQueue.push([&]() {
-
-    });
+  }
+}
+inline void vrtr::Application::CreateCommands() {
+  {
+    LOGI("create command pool");
+    auto [graphicsFamily, presentFamily] =
+        FindQueueFamilies(mPhysicalDevice, mSurface);
+    vk::CommandPoolCreateInfo cmdPoolCi{};
+    cmdPoolCi.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+    cmdPoolCi.queueFamilyIndex = graphicsFamily.value();
+    mCmdPool = mDevice.createCommandPool(cmdPoolCi);
+  }
+  {
+    LOGI("create command buffers");
+    vk::CommandBufferAllocateInfo allocInfo{};
+    allocInfo.commandPool = mCmdPool;
+    allocInfo.level = vk::CommandBufferLevel::ePrimary;
+    allocInfo.commandBufferCount = mFramesInFlight;
+    mCmdBuffers = mDevice.allocateCommandBuffers(allocInfo);
+  }
+  {
+    LOGI("create sync structures");
+    constexpr vk::SemaphoreCreateInfo semaphoreInfo;
+    constexpr vk::FenceCreateInfo fenceInfo{vk::FenceCreateFlagBits::eSignaled};
+    for (int i = 0; i < mFramesInFlight; i++) {
+      mImageAvailableSemaphores.emplace_back(mDevice, semaphoreInfo);
+      mRenderFinishedSemaphores.emplace_back(mDevice, semaphoreInfo);
+      mInFlightFences.emplace_back(mDevice, fenceInfo);
+    }
   }
 }
 inline void vrtr::Application::CreateCamera() {}
 inline void vrtr::Application::CreateGui() {}
+inline void vrtr::Application::TickRender(float delta) {
+  VK_HPP_CHECK(mDevice.waitForFences({*mInFlightFences[mCurrentFrame]}, true,
+                                     kVkOneSecond),
+               "wait for last frame to be done");
+
+  uint32_t imageIndex = 0;
+  try {
+    auto [nxtRes, idx] = mSwapchain.acquireNextImage(
+        kVkOneSecond,
+        /* Will be signaled when this image is available */
+        {*mImageAvailableSemaphores[mCurrentFrame]});
+    imageIndex = idx;
+  } catch (const vk::OutOfDateKHRError) {
+    RecreateSwapchain();
+    return;
+  }
+
+  mDevice.resetFences({
+      *mInFlightFences[mCurrentFrame],
+  });
+
+  { // Recording is on CPU, no need to
+    // wait for available image.
+    const auto &cmd = mCmdBuffers[mCurrentFrame];
+    cmd.reset();
+    constexpr vk::CommandBufferBeginInfo beginInfo{};
+    cmd.begin(beginInfo);
+    vk::RenderPassBeginInfo renderPassBeginInfo{};
+    renderPassBeginInfo.setRenderPass(mRenderPass);
+    renderPassBeginInfo.setFramebuffer(mSwapchainFramebuffers[imageIndex]);
+    renderPassBeginInfo.setRenderArea({{0, 0}, mSwapchainExtent});
+    vk::ClearValue clearColor = vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f};
+    renderPassBeginInfo.setClearValues({
+        clearColor,
+    });
+
+    cmd.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, mGraphicsPipeline);
+    // We set them as dynamic before.
+    const vk::Viewport viewport(
+        0.0f, 0.0f,                                  // x, y
+        static_cast<float>(mSwapchainExtent.width),  // width
+        static_cast<float>(mSwapchainExtent.height), // height
+        0.0f, 1.0f                                   // minDepth maxDepth
+    );
+    cmd.setViewport(0, viewport);
+    const vk::Rect2D scissor(vk::Offset2D{0, 0}, // offset
+                             mSwapchainExtent    // extent
+    );
+    cmd.setScissor(0, scissor);
+
+    cmd.draw(3, 1, 0, 0);
+    cmd.endRenderPass();
+    cmd.end();
+  }
+
+  vk::SubmitInfo submitInfo;
+  std::array<vk::PipelineStageFlags, 1> waitStages = {
+      vk::PipelineStageFlagBits::eColorAttachmentOutput};
+  submitInfo.setWaitSemaphores({*mImageAvailableSemaphores[mCurrentFrame]})
+      .setWaitDstStageMask(waitStages)
+      .setCommandBuffers({
+          *mCmdBuffers[mCurrentFrame],
+      })
+      // .setSignalSemaphores({*mRenderFinishedSemaphores[imageIndex]});
+      .setSignalSemaphores({*mRenderFinishedSemaphores[mCurrentFrame]});
+
+  mGraphicsQueue.submit(
+      submitInfo,
+      mInFlightFences
+          // [imageIndex] /* Will be triggered after this command is done */);
+          [mCurrentFrame] /* Will be triggered after this command is done */);
+
+  vk::PresentInfoKHR presentInfo;
+  // presentInfo.setWaitSemaphores({*mRenderFinishedSemaphores[imageIndex]});
+  presentInfo.setWaitSemaphores({*mRenderFinishedSemaphores[mCurrentFrame]});
+  presentInfo.setSwapchains({*mSwapchain});
+  presentInfo.pImageIndices = &imageIndex;
+  try {
+    auto res = mPresentQueue.presentKHR(presentInfo);
+    if (res == vk::Result::eSuboptimalKHR)
+      RecreateSwapchain();
+  } catch (const vk::OutOfDateKHRError) {
+    RecreateSwapchain();
+  }
+  mCurrentFrame = (mCurrentFrame + 1) % mFramesInFlight;
+  /**
+   * render context
+   *    begin frame, wait and acquire image in
+   * request cmd buffer
+   * update stats and gui
+   * do render
+   * present
+   */
+  // mGpu.updateScene(mScene);
+  // mGpu.draw();
+}
+
+inline void vrtr::Application::RecreateSwapchain() {
+  LOGD("recreate swapchain");
+  auto extent = mWindow->GetWindowSize();
+  while (extent.height == 0 || extent.width == 0) 
+    extent = mWindow->GetWindowSize();
+  mDevice.waitIdle();
+
+  // RAII allows direct overwrite, but write these down to make it clear.
+  mSwapchainFramebuffers.clear();
+  mSwapchainImageViews.clear();
+  mSwapchain = nullptr;
+
+  CreateRenderContext();
+  CreateFramebuffer();
+}
