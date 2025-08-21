@@ -1,11 +1,8 @@
 #pragma once
 
-#include "Scene/Scene.hpp"
 #include "utils/json.hpp"
 #include "Window.hpp"
-#include "rendering/RenderContext.hpp"
 #include "utils/vk/pipelines.hpp"
-#include "utils/DeletionQueue.hpp"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -89,7 +86,6 @@ private:
 
   // TODO Use unique_ptr?
   const Window *mWindow;
-  Scene mScene;
 
   vk::raii::Context mVkContext;
   // TODO See core/hpp_instance.h for more encapsule.
@@ -113,7 +109,6 @@ private:
   std::vector<vk::raii::ImageView> mSwapchainImageViews;
   vk::Format mSwapchainImageFormat{};
   vk::Extent2D mSwapchainExtent{};
-  std::unique_ptr<RenderContext> mRenderContext;
 
   vk::raii::RenderPass mRenderPass{nullptr};
   std::vector<vk::raii::Framebuffer> mSwapchainFramebuffers;
@@ -752,7 +747,7 @@ inline void vrtr::Application::TickRender(float delta) {
 inline void vrtr::Application::RecreateSwapchain() {
   LOGD("recreate swapchain");
   auto extent = mWindow->GetWindowSize();
-  while (extent.height == 0 || extent.width == 0) 
+  while (extent.height == 0 || extent.width == 0)
     extent = mWindow->GetWindowSize();
   mDevice.waitIdle();
 

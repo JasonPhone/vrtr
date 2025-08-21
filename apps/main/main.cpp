@@ -1,8 +1,7 @@
 #include "Platform.hpp"
 #include "utils/json.hpp"
 
-int main(int, char *[]) {
-
+void runEngine() {
   Json config = nlohmann::json::parse(
       R"({"name": "vrtr", "window": {"width": 1280, "height": 720}, "engine": {}})");
 #ifdef NDEBUG
@@ -21,6 +20,11 @@ int main(int, char *[]) {
   } catch (const std::exception &err) {
     LOGE("vk::SystemError - what: {}", err.what());
   }
+}
+
+int main(int, char *[]) {
+
+  runEngine();
 
   return 0;
 }

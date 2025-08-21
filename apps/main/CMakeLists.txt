@@ -16,15 +16,35 @@ if(WIN32)
   # set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
   find_package(Vulkan REQUIRED)
 
+  add_library(${PROJECT_NAME}_RHI STATIC
+    # RHI
+    ${SOURCE_DIR}/rendering/RHI/RHIResource.cpp
+
+    # Vulkan backend
+    ${SOURCE_DIR}/rendering/RHI/VulkanBackend/VulkanResource.cpp
+  )
+  target_include_directories(${PROJECT_NAME}_RHI PRIVATE
+    ${Vulkan_INCLUDE_DIRS}
+
+    ${CMAKE_SOURCE_DIR}/extern/GLM
+    ${CMAKE_SOURCE_DIR}/extern/SDL/include
+    ${CMAKE_SOURCE_DIR}/extern/ImGUI/
+    ${CMAKE_SOURCE_DIR}/extern/stb
+    ${CMAKE_SOURCE_DIR}/extern/VMA/include
+    ${CMAKE_SOURCE_DIR}/extern/json/include
+
+    ${CMAKE_SOURCE_DIR}/include
+  )
+
   add_library(${PROJECT_NAME}_runtime STATIC
-    ${SOURCE_DIR}/GPU/GPU.cpp
-    ${SOURCE_DIR}/Window.cpp
 
     ${SOURCE_DIR}/utils/vk/descriptors.cpp
     ${SOURCE_DIR}/utils/vk/images.cpp
     ${SOURCE_DIR}/utils/vk/initializers.cpp
     # ${SOURCE_DIR}/utils/vk/loader.cpp
     ${SOURCE_DIR}/utils/vk/pipelines.cpp
+
+    ${SOURCE_DIR}/Window.cpp
   )
   target_link_libraries(${PROJECT_NAME}_runtime PRIVATE
     fastgltf
@@ -43,7 +63,6 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/fastgltf/include
     ${CMAKE_SOURCE_DIR}/extern/json/include
 
-    # ${CMAKE_SOURCE_DIR}/extern/spdlog/include
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
   )
@@ -62,7 +81,6 @@ if(WIN32)
     ${CMAKE_SOURCE_DIR}/extern/VMA/include
     ${CMAKE_SOURCE_DIR}/extern/json/include
 
-    # ${CMAKE_SOURCE_DIR}/extern/spdlog/include
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
   )
@@ -79,10 +97,8 @@ if(WIN32)
     stb
     spdlog
 
-    # vma # Impl in ./src/vk_engine.cpp
-    # fmt::fmt
-
     # Project binaries.
+    ${PROJECT_NAME}_RHI
     ${PROJECT_NAME}_runtime
   )
 

@@ -14,13 +14,14 @@ Render pass and dynamic rendering.
 
 - [x] detailed compute pipeline for data processing. See branch `var.compute`
 - [x] move to RenderPass.
-- [ ] A framework using RAII.
+- [ ] vulkan backend and RAII.
 - [ ] deferred rendering.
 - [ ] Debug and stat.
 - [ ] ECS scene.
 - [ ] RDG
 - [ ] GPU-driven, pbr ibl, other global features
 - [ ] Multithreading.
+- [ ] Eigen?
 
 ## Structure
 
