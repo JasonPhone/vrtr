@@ -555,6 +555,10 @@ void GPU::draw() {
   VK_CHECK(vkEndCommandBuffer(cmd));
 
   // Submit commands.
+  /**
+   * @todo for semaphore reusing issue, refer to 
+   * https://docs.vulkan.org/guide/latest/swapchain_semaphore_reuse.html
+   */
   VkCommandBufferSubmitInfo cmd_submit_info = vkinit::cmdBufferSubmitInfo(cmd);
   // LOGD("submit waits for sem of frame[{}]({:X})", m_frame_number,
   //      uint64_t(m_frames[m_frame_number].image_presented_semaphore));

@@ -8,6 +8,8 @@ Scene structure, material model and shading model are all to be explored.
 
 Render pass and dynamic rendering.
 
+current build system on Windows: Clang 21.1.0 x86_64, Ninja, using MSVC lib.
+
 # TODO
 
 ## Function
@@ -28,6 +30,8 @@ Render pass and dynamic rendering.
 - [ ] Clean code structure.
 - [ ] tick-based rendering.
 - [ ] Take Vulkan and engine stuff out of glTF loaders. Use a middle layer to map the data.
+
+some extern: GLM, Volk, SDL, VMA.
 
 # Notes
 

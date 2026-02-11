@@ -136,24 +136,44 @@ GetRequiredExtensions(const vrtr::Window *window) {
   return extVec;
 }
 
-static VKAPI_ATTR uint32_t VKAPI_CALL DebugMessageCallback(
-    vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    vk::DebugUtilsMessageTypeFlagsEXT messageTypes,
-    vk::DebugUtilsMessengerCallbackDataEXT const *pCallbackData,
+// static VKAPI_ATTR uint32_t VKAPI_CALL DebugMessageCallback(
+//     vk::DebugUtilsMessageTypeFlagsEXT messageTypes,
+static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugMessageCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    // vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    // vk::DebugUtilsMessageTypeFlagsEXT messageTypes,
+    VkDebugUtilsMessengerCallbackDataEXT const *pCallbackData,
+    // vk::DebugUtilsMessengerCallbackDataEXT const *pCallbackData,
     void *pUserData) {
   switch (messageSeverity) {
-  case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
     LOGD("validation layer: {}", pCallbackData->pMessage);
     break;
-  case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
     LOGI("validation layer: {}", pCallbackData->pMessage);
     break;
-  case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
     LOGW("validation layer: {}", pCallbackData->pMessage);
     break;
-  case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
     LOGE("validation layer: {}", pCallbackData->pMessage);
     break;
+  default:
+    LOGE("unknown message severity, validation layer: {}",
+         pCallbackData->pMessage);
+    // case VkDebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
+    //   LOGD("validation layer: {}", pCallbackData->pMessage);
+    //   break;
+    // case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
+    //   LOGI("validation layer: {}", pCallbackData->pMessage);
+    //   break;
+    // case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
+    //   LOGW("validation layer: {}", pCallbackData->pMessage);
+    //   break;
+    // case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
+    //   LOGE("validation layer: {}", pCallbackData->pMessage);
+    //   break;
   }
   return false;
 }

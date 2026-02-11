@@ -13,6 +13,10 @@ if(WIN32)
   set(HEADER_DIR "${CMAKE_SOURCE_DIR}/include")
   set(SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 
+  if (MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  endif()
+
   # set(ENV{VULKAN_SDK} "C:/VulkanSDK/1.3.290.0")
   find_package(Vulkan REQUIRED)
 

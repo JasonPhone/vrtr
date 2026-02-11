@@ -1,9 +1,9 @@
 {
 	"folders": [
-		{
-			"path": ".."
-		}
-	],
+    {
+      "path": ".."
+    }
+  ],
 	"settings": {
     "cmake.generator": "Ninja",
 		"cSpell.words": [
@@ -39,9 +39,6 @@
     "glsl-canvas.useCompactFormatter": false,
     "glsllint.glslangValidatorArgs": [
       "-V"
-    ],
-    "cSpell.enableFiletypes": [
-      "glsl"
     ],
     "clangd.arguments": ["-header-insertion=never"]
 	}
